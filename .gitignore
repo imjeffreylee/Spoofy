@@ -1,0 +1,19 @@
+# Python 暫存檔
+__pycache__/
+*.py[cod]
+*$py.class
+
+# 虛擬環境
+venv/
+env/
+
+# 作業系統暫存檔
+.DS_Store
+Thumbs.db
+
+# 個人設定檔 (保護隱私，不要上傳)
+config.json
+
+# 其他
+.vscode/
+.idea/
