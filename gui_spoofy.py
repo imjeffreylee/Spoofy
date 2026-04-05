@@ -11,7 +11,7 @@ from geopy.distance import geodesic
 # 從原本的檔案只匯入取得連線的方法與設定
 from spoofy import get_device_provider, load_config
 
-class GUISpoofer:
+class GUISpoofy:
     """專為 GUI 設計的 Spoofer，移除所有 input() 與終端機監聽"""
     def __init__(self, provider, is_ios17, log_callback):
         self.provider = provider
@@ -198,7 +198,7 @@ class App(ctk.CTk):
         async def connect():
             try:
                 provider, is_ios17 = await get_device_provider()
-                self.spoofer = GUISpoofer(provider, is_ios17, self.log)
+                self.spoofer = GUISpoofy(provider, is_ios17, self.log)
                 self.after(0, self.on_connected)
                 self.log(f"✅ 連線成功 (iOS 17+: {is_ios17})")
             except Exception as e:
