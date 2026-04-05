@@ -11,12 +11,14 @@ from geopy.distance import geodesic
 from geopy.geocoders import Nominatim
 from pymobiledevice3.lockdown import create_using_usbmux
 from pymobiledevice3.services.simulate_location import DtSimulateLocation
-from pymobiledevice3.services.dvt.instruments.location_simulation import LocationSimulation
+from pymobiledevice3.services.dvt.instruments.location_simulation import (
+    LocationSimulation,
+)
 from pymobiledevice3.services.dvt.instruments.dvt_provider import DvtProvider
 from pymobiledevice3.tunneld.api import get_tunneld_devices, TUNNELD_DEFAULT_ADDRESS
 
 # 判斷作業系統
-IS_WINDOWS = platform.system() == 'Windows'
+IS_WINDOWS = platform.system() == "Windows"
 if IS_WINDOWS:
     import msvcrt
 else:
@@ -52,7 +54,8 @@ USAGE_GUIDE = """
 ========================================================================
 """
 
-class Spoofer:
+
+class Spoofy:
     def __init__(self, provider, is_ios17):
         self.provider = provider
         self.is_ios17 = is_ios17
@@ -62,19 +65,26 @@ class Spoofer:
         """核心功能：執行定位修改並保持連線鎖定"""
         try:
             if self.is_ios17:
-                async with DvtProvider(self.provider) as dvt, LocationSimulation(dvt) as loc:
+                async with (
+                    DvtProvider(self.provider) as dvt,
+                    LocationSimulation(dvt) as loc,
+                ):
                     await loc.set(lat, lng)
                     print(f"\n🚀 成功定位至座標: 緯度 {lat}, 經度 {lng}")
                     print("🔒 目前正在『鎖定定位』中，防止 iPhone 自動跳回真實位置...")
                     print("👉 [提示] 在此狀態下您可以安心使用手機。")
                     # 使用 input 阻擋程式繼續執行，藉此保持 DVT 通道開啟
-                    await asyncio.to_thread(input, "\n↩️  若要結束鎖定並回到主選單，請按【Enter】鍵...")
+                    await asyncio.to_thread(
+                        input, "\n↩️  若要結束鎖定並回到主選單，請按【Enter】鍵..."
+                    )
             else:
                 service = DtSimulateLocation(self.provider)
                 await service.set(lat, lng)
                 print(f"\n🚀 成功定位至座標: 緯度 {lat}, 經度 {lng}")
                 print("🔒 目前正在『鎖定定位』中，防止 iPhone 自動跳回真實位置...")
-                await asyncio.to_thread(input, "\n↩️  若要結束鎖定並回到主選單，請按【Enter】鍵...")
+                await asyncio.to_thread(
+                    input, "\n↩️  若要結束鎖定並回到主選單，請按【Enter】鍵..."
+                )
         except Exception as e:
             print(f"❌ 定位失敗: {e}")
             self._check_mount_error(e)
@@ -92,33 +102,48 @@ class Spoofer:
 
         total_time_seconds = total_distance / speed_ms
         steps = int(total_time_seconds)
-        
+
         # 計算預計完成時間
         now = datetime.now()
         finish_time = now + timedelta(seconds=total_time_seconds)
 
-        print(f"🚶 開始導航！總距離: {total_distance:.2f} 公尺, 預計耗時: {total_time_seconds:.2f} 秒")
+        print(
+            f"🚶 開始導航！總距離: {total_distance:.2f} 公尺, 預計耗時: {total_time_seconds:.2f} 秒"
+        )
         print(f"🏁 預計結束時間：{finish_time.strftime('%H:%M:%S')}")
         print("💡 【提示】在導航過程中，您可以隨時按下 `Ctrl+S` 中斷導航。")
 
         try:
             if self.is_ios17:
-                async with DvtProvider(self.provider) as dvt, LocationSimulation(dvt) as loc:
-                    await self._do_walk(loc, start_lat, start_lng, end_lat, end_lng, steps)
+                async with (
+                    DvtProvider(self.provider) as dvt,
+                    LocationSimulation(dvt) as loc,
+                ):
+                    await self._do_walk(
+                        loc, start_lat, start_lng, end_lat, end_lng, steps
+                    )
                     print("🏁 抵達目的地！")
-                    await asyncio.to_thread(input, "\n↩️  導航結束。請按【Enter】鍵回到主選單...")
+                    await asyncio.to_thread(
+                        input, "\n↩️  導航結束。請按【Enter】鍵回到主選單..."
+                    )
             else:
                 service = DtSimulateLocation(self.provider)
-                await self._do_walk(service, start_lat, start_lng, end_lat, end_lng, steps)
+                await self._do_walk(
+                    service, start_lat, start_lng, end_lat, end_lng, steps
+                )
                 print("🏁 抵達目的地！")
-                await asyncio.to_thread(input, "\n↩️  導航結束。請按【Enter】鍵回到主選單...")
+                await asyncio.to_thread(
+                    input, "\n↩️  導航結束。請按【Enter】鍵回到主選單..."
+                )
         except KeyboardInterrupt:
             print("\n🛑 導航已中斷！正在返回主選單...")
         except Exception as e:
             print(f"❌ 行走過程中發生錯誤: {e}")
             self._check_mount_error(e)
 
-    async def _do_walk(self, loc_service, start_lat, start_lng, end_lat, end_lng, steps):
+    async def _do_walk(
+        self, loc_service, start_lat, start_lng, end_lat, end_lng, steps
+    ):
         if not IS_WINDOWS:
             fd = sys.stdin.fileno()
             old_settings = termios.tcgetattr(fd)
@@ -135,12 +160,12 @@ class Spoofer:
                 if IS_WINDOWS:
                     if msvcrt.kbhit():
                         char = msvcrt.getch()
-                        if char == b'\x13':  # Ctrl + S 的 Hex code
+                        if char == b"\x13":  # Ctrl + S 的 Hex code
                             raise KeyboardInterrupt
                 else:
                     if select.select([sys.stdin], [], [], 0)[0]:
                         char = sys.stdin.read(1)
-                        if char == '\x13':  # Ctrl + S
+                        if char == "\x13":  # Ctrl + S
                             raise KeyboardInterrupt
 
                 ratio = step / steps if steps > 0 else 1.0
@@ -148,7 +173,9 @@ class Spoofer:
                 current_lng = start_lng + (end_lng - start_lng) * ratio
 
                 await loc_service.set(current_lat, current_lng)
-                print(f"進度 {ratio * 100:.1f}% | 當前位置: {current_lat:.5f}, {current_lng:.5f}")
+                print(
+                    f"進度 {ratio * 100:.1f}% | 當前位置: {current_lat:.5f}, {current_lng:.5f}"
+                )
                 await asyncio.sleep(1)
         except asyncio.CancelledError:
             pass
@@ -166,9 +193,11 @@ class Spoofer:
         print(f"🔍 正在搜尋 '{query}' ...")
         ctx = ssl.create_default_context(cafile=certifi.where())
         geolocator = Nominatim(user_agent="spoofy_cli", ssl_context=ctx)
-        
+
         try:
-            results = await asyncio.to_thread(geolocator.geocode, query, exactly_one=False, limit=10)
+            results = await asyncio.to_thread(
+                geolocator.geocode, query, exactly_one=False, limit=10
+            )
         except Exception as e:
             print(f"❌ 搜尋時發生錯誤: {e}")
             return
@@ -193,10 +222,10 @@ class Spoofer:
         """功能 4：手動輸入座標 (支援 Google Maps 格式)"""
         print("\n📍 請貼上座標 (格式如: 25.0339, 121.5644)")
         raw_input = input("座標：").strip()
-        
+
         # 使用正則表達式嘗試提取經緯度數字
         coords = re.findall(r"[-+]?\d*\.\d+|\d+", raw_input)
-        
+
         if len(coords) >= 2:
             try:
                 lat = float(coords[0])
@@ -213,11 +242,11 @@ class Spoofer:
         print("\n📍 請輸入起點 A 的座標 (格式如: 25.0339, 121.5644)")
         raw_start = input("起點座標：").strip()
         coords_start = re.findall(r"[-+]?\d*\.\d+|\d+", raw_start)
-        
+
         if len(coords_start) < 2:
             print("❌ 格式不正確，請確保包含起點的經度和緯度。")
             return
-        
+
         try:
             start_lat = float(coords_start[0])
             start_lng = float(coords_start[1])
@@ -232,7 +261,7 @@ class Spoofer:
         if len(coords_end) < 2:
             print("❌ 格式不正確，請確保包含終點的經度和緯度。")
             return
-            
+
         try:
             end_lat = float(coords_end[0])
             end_lng = float(coords_end[1])
@@ -255,7 +284,9 @@ class Spoofer:
                 print("❌ 無法解析時速數字。")
                 return
 
-        print(f"解析成功：從 ({start_lat}, {start_lng}) 導航至 ({end_lat}, {end_lng})，時速 {speed} km/h")
+        print(
+            f"解析成功：從 ({start_lat}, {start_lng}) 導航至 ({end_lat}, {end_lng})，時速 {speed} km/h"
+        )
         await self.walk((start_lat, start_lng), (end_lat, end_lng), speed_kmh=speed)
 
     def _check_mount_error(self, error):
@@ -265,6 +296,7 @@ class Spoofer:
                 print("請啟動隧道：sudo python3 -m pymobiledevice3 remote tunneld")
             else:
                 print("請嘗試掛載：python3 -m pymobiledevice3 mounter auto-mount")
+
 
 async def get_device_provider():
     try:
@@ -283,14 +315,16 @@ async def get_device_provider():
         else:
             product_version = res
 
-        is_ios17 = int(product_version.split('.')[0]) >= 17
-        
+        is_ios17 = int(product_version.split(".")[0]) >= 17
+
         if is_ios17:
             print(f"偵測到 iOS {product_version}，正在檢查 Tunneld...")
             try:
                 rsds = await get_tunneld_devices(TUNNELD_DEFAULT_ADDRESS)
                 if not rsds:
-                    print("\n❌ 找不到 Tunnel 裝置，請先執行：sudo python3 -m pymobiledevice3 remote tunneld")
+                    print(
+                        "\n❌ 找不到 Tunnel 裝置，請先執行：sudo python3 -m pymobiledevice3 remote tunneld"
+                    )
                     sys.exit(1)
                 return rsds[0], True
             except Exception as e:
@@ -301,19 +335,21 @@ async def get_device_provider():
     except Exception as e:
         print(f"❌ 發生未知錯誤：{e}")
         import traceback
+
         traceback.print_exc()
         sys.exit(1)
+
 
 def load_config():
     """從 config.json 載入常用地點座標"""
     default_config = {
         "home": [25.027718192429898, 121.54652202461413],
         "company": [25.127024499013306, 121.47395879902238],
-        "speed": 19.0
+        "speed": 19.0,
     }
-    
+
     config_path = os.path.join(os.path.dirname(__file__), "config.json")
-    
+
     if os.path.exists(config_path):
         try:
             with open(config_path, "r") as f:
@@ -321,21 +357,26 @@ def load_config():
                 return (
                     tuple(config.get("home", default_config["home"])),
                     tuple(config.get("company", default_config["company"])),
-                    float(config.get("speed", default_config["speed"]))
+                    float(config.get("speed", default_config["speed"])),
                 )
         except Exception as e:
             print(f"⚠️ 讀取設定檔發生錯誤: {e}，將使用預設座標。")
-    
-    return tuple(default_config["home"]), tuple(default_config["company"]), default_config["speed"]
+
+    return (
+        tuple(default_config["home"]),
+        tuple(default_config["company"]),
+        default_config["speed"],
+    )
+
 
 async def main():
     print(USAGE_GUIDE)
-    
+
     # 載入設定
     home, company, default_speed = load_config()
-    
+
     provider, is_ios17 = await get_device_provider()
-    spoofer = Spoofer(provider, is_ios17)
+    spoofer = Spoofy(provider, is_ios17)
 
     while True:
         try:
@@ -353,7 +394,7 @@ async def main():
                 await spoofer.manual_input_teleport()
             elif choice == "3":
                 await spoofer.custom_walk()
-            elif choice == 'q':
+            elif choice == "q":
                 print("程式結束。")
                 break
             else:
@@ -361,6 +402,7 @@ async def main():
         except KeyboardInterrupt:
             print("\n👋 程式已結束。")
             break
+
 
 if __name__ == "__main__":
     asyncio.run(main())
