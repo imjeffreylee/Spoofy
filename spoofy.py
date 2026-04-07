@@ -127,7 +127,7 @@ class Spoofy:
             print("⚠️ 無法取得導航路徑，將改為直線移動。")
             path = [start_coords, end_coords]
 
-        print("💡 【提示】在導航過程中，您可以隨時按下 `Ctrl+S` 中斷導航。")
+        print("💡 【提示】在導航過程中，您可以隨時按下 `Enter` 鍵中斷導航。")
 
         try:
             if self.is_ios17:
@@ -159,7 +159,7 @@ class Spoofy:
             old_settings = termios.tcgetattr(fd)
             # 設定為 cbreak 模式以即時讀取按鍵
             tty.setcbreak(fd)
-            # 關閉流控制 (IXON)，否則 Ctrl+S 會凍結終端機輸出
+            # 關閉流控制 (IXON)，否則 Ctrl+S 等按鍵可能被攔截
             new_settings = termios.tcgetattr(fd)
             new_settings[0] &= ~(termios.IXON | termios.IXOFF)
             termios.tcsetattr(fd, termios.TCSANOW, new_settings)
@@ -188,16 +188,16 @@ class Spoofy:
 
         try:
             while current_dist < total_dist:
-                # 檢查是否有按鍵輸入 (偵測 Ctrl + S)
+                # 檢查是否有按鍵輸入 (偵測 Enter 鍵)
                 if IS_WINDOWS:
                     if msvcrt.kbhit():
                         char = msvcrt.getch()
-                        if char == b"\x13":  # Ctrl + S 的 Hex code
+                        if char in (b"\r", b"\n"):  # Enter 鍵
                             raise KeyboardInterrupt
                 else:
                     if select.select([sys.stdin], [], [], 0)[0]:
                         char = sys.stdin.read(1)
-                        if char == "\x13":  # Ctrl + S
+                        if char in ("\n", "\r"):  # Enter 鍵
                             raise KeyboardInterrupt
 
                 elapsed = asyncio.get_event_loop().time() - start_time
