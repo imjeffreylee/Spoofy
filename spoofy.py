@@ -6,6 +6,8 @@ import re
 import platform
 import json
 import os
+import urllib.request
+import urllib.parse
 from datetime import datetime, timedelta
 from geopy.distance import geodesic
 from geopy.geocoders import Nominatim
@@ -41,7 +43,7 @@ USAGE_GUIDE = """
    python3 spoofy.py
 
 【功能說明】
-[1] 兩點導航移動：模擬從 A 點走到 B 點的移動過程 (預設住家到公司)。
+[1] 兩點導航移動：模擬從 A 點走到 B 點的移動過程 (預設常用起點到常用終點)。
 [2] 手動輸入座標：最精準！直接貼上 Google Maps 複製的數字。
 [3] 自訂導航移動：手動輸入起點、終點座標以及時速，進行自訂導航。
 
@@ -89,28 +91,42 @@ class Spoofy:
             print(f"❌ 定位失敗: {e}")
             self._check_mount_error(e)
 
-    async def walk(self, start_coords, end_coords, speed_kmh=5.0):
-        """功能 2：模擬兩點間行走"""
+    async def get_route(self, start_coords, end_coords):
+        """取得兩點間的真實路徑座標點 (使用 OSRM 公開 API)"""
         start_lat, start_lng = start_coords
         end_lat, end_lng = end_coords
 
-        speed_ms = speed_kmh / 3.6
-        total_distance = geodesic(start_coords, end_coords).meters
-        if total_distance == 0:
-            print("A 點和 B 點相同！")
-            return
+        # OSRM 格式: lon,lat;lon,lat
+        url = f"http://router.project-osrm.org/route/v1/driving/{start_lng},{start_lat};{end_lng},{end_lat}?overview=full&geometries=geojson"
 
-        total_time_seconds = total_distance / speed_ms
-        steps = int(total_time_seconds)
+        try:
 
-        # 計算預計完成時間
-        now = datetime.now()
-        finish_time = now + timedelta(seconds=total_time_seconds)
+            def _fetch_route():
+                with urllib.request.urlopen(url, timeout=10) as response:
+                    return json.loads(response.read().decode())
 
-        print(
-            f"🚶 開始導航！總距離: {total_distance:.2f} 公尺, 預計耗時: {total_time_seconds:.2f} 秒"
-        )
-        print(f"🏁 預計結束時間：{finish_time.strftime('%H:%M:%S')}")
+            data = await asyncio.to_thread(_fetch_route)
+
+            if data.get("code") == "Ok" and data.get("routes"):
+                # OSRM 回傳的是 [lng, lat]
+                coords = data["routes"][0]["geometry"]["coordinates"]
+                return [(lat, lng) for lng, lat in coords]
+            else:
+                print(f"❌ 無法取得導航路徑：{data.get('message', '未知錯誤')}")
+                return None
+        except Exception as e:
+            print(f"❌ 網路連線錯誤 (取得路徑失敗): {e}")
+            return None
+
+    async def walk(self, start_coords, end_coords, speed_kmh=5.0):
+        """功能 2：模擬兩點間行走 (支援真實道路導航)"""
+        print("\n🔍 正在規劃真實道路路徑...")
+        path = await self.get_route(start_coords, end_coords)
+
+        if not path:
+            print("⚠️ 無法取得導航路徑，將改為直線移動。")
+            path = [start_coords, end_coords]
+
         print("💡 【提示】在導航過程中，您可以隨時按下 `Ctrl+S` 中斷導航。")
 
         try:
@@ -119,19 +135,15 @@ class Spoofy:
                     DvtProvider(self.provider) as dvt,
                     LocationSimulation(dvt) as loc,
                 ):
-                    await self._do_walk(
-                        loc, start_lat, start_lng, end_lat, end_lng, steps
-                    )
-                    print("🏁 抵達目的地！")
+                    await self._do_walk(loc, path, speed_kmh)
+                    print("\n🏁 抵達目的地！")
                     await asyncio.to_thread(
                         input, "\n↩️  導航結束。請按【Enter】鍵回到主選單..."
                     )
             else:
                 service = DtSimulateLocation(self.provider)
-                await self._do_walk(
-                    service, start_lat, start_lng, end_lat, end_lng, steps
-                )
-                print("🏁 抵達目的地！")
+                await self._do_walk(service, path, speed_kmh)
+                print("\n🏁 抵達目的地！")
                 await asyncio.to_thread(
                     input, "\n↩️  導航結束。請按【Enter】鍵回到主選單..."
                 )
@@ -141,9 +153,7 @@ class Spoofy:
             print(f"❌ 行走過程中發生錯誤: {e}")
             self._check_mount_error(e)
 
-    async def _do_walk(
-        self, loc_service, start_lat, start_lng, end_lat, end_lng, steps
-    ):
+    async def _do_walk(self, loc_service, path, speed_kmh):
         if not IS_WINDOWS:
             fd = sys.stdin.fileno()
             old_settings = termios.tcgetattr(fd)
@@ -154,8 +164,30 @@ class Spoofy:
             new_settings[0] &= ~(termios.IXON | termios.IXOFF)
             termios.tcsetattr(fd, termios.TCSANOW, new_settings)
 
+        speed_ms = speed_kmh / 3.6
+        # 計算路徑段距離
+        segments = []
+        total_dist = 0
+        for i in range(len(path) - 1):
+            d = geodesic(path[i], path[i + 1]).meters
+            segments.append(d)
+            total_dist += d
+
+        if total_dist == 0:
+            return
+
+        total_time = total_dist / speed_ms
+        finish_time = datetime.now() + timedelta(seconds=total_time)
+        print(
+            f"🚶 開始導航！路徑距離: {total_dist:.2f} 公尺, 預計耗時: {total_time:.1f} 秒"
+        )
+        print(f"🏁 預計結束時間：{finish_time.strftime('%H:%M:%S')}")
+
+        current_dist = 0
+        start_time = asyncio.get_event_loop().time()
+
         try:
-            for step in range(steps + 1):
+            while current_dist < total_dist:
                 # 檢查是否有按鍵輸入 (偵測 Ctrl + S)
                 if IS_WINDOWS:
                     if msvcrt.kbhit():
@@ -168,15 +200,37 @@ class Spoofy:
                         if char == "\x13":  # Ctrl + S
                             raise KeyboardInterrupt
 
-                ratio = step / steps if steps > 0 else 1.0
-                current_lat = start_lat + (end_lat - start_lat) * ratio
-                current_lng = start_lng + (end_lng - start_lng) * ratio
+                elapsed = asyncio.get_event_loop().time() - start_time
+                current_dist = elapsed * speed_ms
 
-                await loc_service.set(current_lat, current_lng)
-                print(
-                    f"進度 {ratio * 100:.1f}% | 當前位置: {current_lat:.5f}, {current_lng:.5f}"
-                )
+                if current_dist >= total_dist:
+                    break
+
+                # 尋找當前位置在路徑中的段落
+                acc_dist = 0
+                for i, seg_dist in enumerate(segments):
+                    if acc_dist + seg_dist >= current_dist:
+                        ratio = (
+                            (current_dist - acc_dist) / seg_dist
+                            if seg_dist > 0
+                            else 1.0
+                        )
+                        p1, p2 = path[i], path[i + 1]
+                        cur_lat = p1[0] + (p2[0] - p1[0]) * ratio
+                        cur_lng = p1[1] + (p2[1] - p1[1]) * ratio
+                        await loc_service.set(cur_lat, cur_lng)
+                        print(
+                            f"進度 {current_dist / total_dist * 100:.1f}% | 當前位置: {cur_lat:.5f}, {cur_lng:.5f}    ",
+                            end="\r",
+                        )
+                        break
+                    acc_dist += seg_dist
+
                 await asyncio.sleep(1)
+
+            # 設定到最後一點
+            await loc_service.set(path[-1][0], path[-1][1])
+            print(f"進度 100.0% | 當前位置: {path[-1][0]:.5f}, {path[-1][1]:.5f}    ")
         except asyncio.CancelledError:
             pass
         finally:
@@ -343,8 +397,8 @@ async def get_device_provider():
 def load_config():
     """從 config.json 載入常用地點座標"""
     default_config = {
-        "home": [25.027718192429898, 121.54652202461413],
-        "company": [25.127024499013306, 121.47395879902238],
+        "start": [25.027718192429898, 121.54652202461413],
+        "end": [25.127024499013306, 121.47395879902238],
         "speed": 19.0,
     }
 
@@ -355,16 +409,16 @@ def load_config():
             with open(config_path, "r") as f:
                 config = json.load(f)
                 return (
-                    tuple(config.get("home", default_config["home"])),
-                    tuple(config.get("company", default_config["company"])),
+                    tuple(config.get("start", default_config["start"])),
+                    tuple(config.get("end", default_config["end"])),
                     float(config.get("speed", default_config["speed"])),
                 )
         except Exception as e:
             print(f"⚠️ 讀取設定檔發生錯誤: {e}，將使用預設座標。")
 
     return (
-        tuple(default_config["home"]),
-        tuple(default_config["company"]),
+        tuple(default_config["start"]),
+        tuple(default_config["end"]),
         default_config["speed"],
     )
 
@@ -373,7 +427,7 @@ async def main():
     print(USAGE_GUIDE)
 
     # 載入設定
-    home, company, default_speed = load_config()
+    start_coords, end_coords, default_speed = load_config()
 
     provider, is_ios17 = await get_device_provider()
     spoofer = Spoofy(provider, is_ios17)
@@ -381,7 +435,7 @@ async def main():
     while True:
         try:
             print("\n請選擇功能：")
-            print(f"1. 住家 -> 公司 (行走模擬) - 預設時速 {default_speed} km/h")
+            print(f"1. 常用起點 -> 常用終點 (行走模擬) - 預設時速 {default_speed} km/h")
             print("2. 手動輸入單一座標 (適合從 Google Maps 複製貼上)")
             print("3. 自訂導航移動 (輸入兩點座標及時速)")
             print("q. 離開程式")
@@ -389,7 +443,7 @@ async def main():
             choice = input("輸入功能編號: ").strip().lower()
 
             if choice == "1":
-                await spoofer.walk(home, company, speed_kmh=default_speed)
+                await spoofer.walk(start_coords, end_coords, speed_kmh=default_speed)
             elif choice == "2":
                 await spoofer.manual_input_teleport()
             elif choice == "3":

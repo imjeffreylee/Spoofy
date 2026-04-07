@@ -4,6 +4,8 @@ import json
 import os
 import re
 import queue
+import urllib.request
+import urllib.parse
 import customtkinter as ctk
 from datetime import datetime, timedelta
 from geopy.distance import geodesic
@@ -19,6 +21,30 @@ class GUISpoofy:
         self.provider = provider
         self.is_ios17 = is_ios17
         self.log = log_callback
+
+    async def get_route(self, start_coords, end_coords):
+        """取得兩點間的真實路徑座標點 (使用 OSRM 公開 API)"""
+        start_lat, start_lng = start_coords
+        end_lat, end_lng = end_coords
+        url = f"http://router.project-osrm.org/route/v1/driving/{start_lng},{start_lat};{end_lng},{end_lat}?overview=full&geometries=geojson"
+
+        try:
+
+            def _fetch_route():
+                with urllib.request.urlopen(url, timeout=10) as response:
+                    return json.loads(response.read().decode())
+
+            data = await asyncio.to_thread(_fetch_route)
+
+            if data.get("code") == "Ok" and data.get("routes"):
+                coords = data["routes"][0]["geometry"]["coordinates"]
+                return [(lat, lng) for lng, lat in coords]
+            else:
+                self.log(f"❌ 無法取得導航路徑：{data.get('message', '未知錯誤')}")
+                return None
+        except Exception as e:
+            self.log(f"❌ 網路連線錯誤 (取得路徑失敗): {e}")
+            return None
 
     async def teleport(self, lat, lng):
         try:
@@ -57,22 +83,12 @@ class GUISpoofy:
             self.log(f"❌ 定位失敗: {e}")
 
     async def walk(self, start_coords, end_coords, speed_kmh=5.0):
-        start_lat, start_lng = start_coords
-        end_lat, end_lng = end_coords
-        speed_ms = speed_kmh / 3.6
-        total_distance = geodesic(start_coords, end_coords).meters
-        if total_distance == 0:
-            self.log("A 點和 B 點相同！")
-            return
+        self.log("🔍 正在規劃真實道路路徑...")
+        path = await self.get_route(start_coords, end_coords)
 
-        total_time_seconds = total_distance / speed_ms
-        steps = int(total_time_seconds)
-        finish_time = datetime.now() + timedelta(seconds=total_time_seconds)
-
-        self.log(
-            f"🚶 開始導航！總距離: {total_distance:.2f} 公尺, 預計耗時: {total_time_seconds:.2f} 秒"
-        )
-        self.log(f"🏁 預計結束時間：{finish_time.strftime('%H:%M:%S')}")
+        if not path:
+            self.log("⚠️ 無法取得導航路徑，將改為直線移動。")
+            path = [start_coords, end_coords]
 
         try:
             if self.is_ios17:
@@ -87,9 +103,7 @@ class GUISpoofy:
                     DvtProvider(self.provider) as dvt,
                     LocationSimulation(dvt) as loc,
                 ):
-                    await self._do_walk(
-                        loc, start_lat, start_lng, end_lat, end_lng, steps
-                    )
+                    await self._do_walk(loc, path, speed_kmh)
                     self.log("🏁 抵達目的地！定位鎖定中...")
                     await asyncio.sleep(86400)
             else:
@@ -98,9 +112,7 @@ class GUISpoofy:
                 )
 
                 service = DtSimulateLocation(self.provider)
-                await self._do_walk(
-                    service, start_lat, start_lng, end_lat, end_lng, steps
-                )
+                await self._do_walk(service, path, speed_kmh)
                 self.log("🏁 抵達目的地！定位鎖定中...")
                 await asyncio.sleep(86400)
         except asyncio.CancelledError:
@@ -108,21 +120,56 @@ class GUISpoofy:
         except Exception as e:
             self.log(f"❌ 行走過程中發生錯誤: {e}")
 
-    async def _do_walk(
-        self, loc_service, start_lat, start_lng, end_lat, end_lng, steps
-    ):
-        for step in range(steps + 1):
-            ratio = step / steps if steps > 0 else 1.0
-            current_lat = start_lat + (end_lat - start_lat) * ratio
-            current_lng = start_lng + (end_lng - start_lng) * ratio
+    async def _do_walk(self, loc_service, path, speed_kmh):
+        speed_ms = speed_kmh / 3.6
+        segments = []
+        total_dist = 0
+        for i in range(len(path) - 1):
+            d = geodesic(path[i], path[i + 1]).meters
+            segments.append(d)
+            total_dist += d
 
-            await loc_service.set(current_lat, current_lng)
-            # 每 3 秒印一次日誌，避免畫面太亂
-            if step % 3 == 0 or step == steps:
-                self.log(
-                    f"進度 {ratio * 100:.1f}% | 當前: {current_lat:.5f}, {current_lng:.5f}"
-                )
+        if total_dist == 0:
+            return
+
+        total_time = total_dist / speed_ms
+        finish_time = datetime.now() + timedelta(seconds=total_time)
+        self.log(f"🚶 開始導航！路徑距離: {total_dist:.2f} 公尺")
+        self.log(f"🏁 預計結束時間：{finish_time.strftime('%H:%M:%S')}")
+
+        current_dist = 0
+        start_time = asyncio.get_event_loop().time()
+
+        while current_dist < total_dist:
+            elapsed = asyncio.get_event_loop().time() - start_time
+            current_dist = elapsed * speed_ms
+
+            if current_dist >= total_dist:
+                break
+
+            acc_dist = 0
+            for i, seg_dist in enumerate(segments):
+                if acc_dist + seg_dist >= current_dist:
+                    ratio = (
+                        (current_dist - acc_dist) / seg_dist if seg_dist > 0 else 1.0
+                    )
+                    p1, p2 = path[i], path[i + 1]
+                    cur_lat = p1[0] + (p2[0] - p1[0]) * ratio
+                    cur_lng = p1[1] + (p2[1] - p1[1]) * ratio
+                    await loc_service.set(cur_lat, cur_lng)
+
+                    # 每 3 秒印一次日誌
+                    if int(elapsed) % 3 == 0:
+                        self.log(
+                            f"進度 {current_dist / total_dist * 100:.1f}% | 當前: {cur_lat:.5f}, {cur_lng:.5f}"
+                        )
+                    break
+                acc_dist += seg_dist
+
             await asyncio.sleep(1)
+
+        await loc_service.set(path[-1][0], path[-1][1])
+        self.log(f"進度 100.0% | 當前: {path[-1][0]:.5f}, {path[-1][1]:.5f}")
 
 
 class App(ctk.CTk):
@@ -138,7 +185,7 @@ class App(ctk.CTk):
         self.loop = None
         self.spoofer = None
         self.current_task = None
-        self.home, self.company, self.default_speed = load_config()
+        self.start_coords, self.end_coords, self.default_speed = load_config()
         self.log_queue = queue.Queue()
 
         # UI 佈局
@@ -167,13 +214,16 @@ class App(ctk.CTk):
         self.control_frame.grid_columnconfigure((0, 1, 2), weight=1)
 
         self.home_btn = ctk.CTkButton(
-            self.control_frame, text="🏠 回家", command=self.go_home, state="disabled"
+            self.control_frame,
+            text="🏠 前往起點",
+            command=self.go_home,
+            state="disabled",
         )
         self.home_btn.grid(row=0, column=0, padx=10, pady=10)
 
         self.comp_btn = ctk.CTkButton(
             self.control_frame,
-            text="🏢 去公司",
+            text="🏢 前往終點",
             command=self.go_company,
             state="disabled",
         )
@@ -311,13 +361,13 @@ class App(ctk.CTk):
 
     def go_home(self):
         if self.spoofer:
-            self.log(f"🏠 準備前往住家...")
-            self.run_action(self.spoofer.teleport(*self.home))
+            self.log(f"🏠 準備前往常用起點...")
+            self.run_action(self.spoofer.teleport(*self.start_coords))
 
     def go_company(self):
         if self.spoofer:
-            self.log(f"🏢 準備前往公司...")
-            self.run_action(self.spoofer.teleport(*self.company))
+            self.log(f"🏢 準備前往常用終點...")
+            self.run_action(self.spoofer.teleport(*self.end_coords))
 
     def manual_teleport(self):
         raw = self.coord_entry.get()
@@ -332,10 +382,12 @@ class App(ctk.CTk):
         raw = self.coord_entry.get()
         coords = re.findall(r"[-+]?\d*\.\d+|\d+", raw)
         if len(coords) >= 2:
-            end_coords = (float(coords[0]), float(coords[1]))
+            dest_coords = (float(coords[0]), float(coords[1]))
             speed = self.speed_slider.get()
-            # 簡化：從家裡走到目的地 (您可以根據需求改成從公司走，或當前位置)
-            self.run_action(self.spoofer.walk(self.home, end_coords, speed_kmh=speed))
+            # 簡化：從常用起點走到目的地
+            self.run_action(
+                self.spoofer.walk(self.start_coords, dest_coords, speed_kmh=speed)
+            )
         else:
             self.log("❌ 請先在輸入框貼上「終點」座標。")
 
