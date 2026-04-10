@@ -400,6 +400,7 @@ def load_config():
         "start": [25.027718192429898, 121.54652202461413],
         "end": [25.127024499013306, 121.47395879902238],
         "speed": 19.0,
+        "frequent_locations": []
     }
 
     config_path = os.path.join(os.path.dirname(__file__), "config.json")
@@ -412,6 +413,7 @@ def load_config():
                     tuple(config.get("start", default_config["start"])),
                     tuple(config.get("end", default_config["end"])),
                     float(config.get("speed", default_config["speed"])),
+                    config.get("frequent_locations", default_config["frequent_locations"])
                 )
         except Exception as e:
             print(f"⚠️ 讀取設定檔發生錯誤: {e}，將使用預設座標。")
@@ -420,6 +422,7 @@ def load_config():
         tuple(default_config["start"]),
         tuple(default_config["end"]),
         default_config["speed"],
+        default_config["frequent_locations"]
     )
 
 
@@ -427,7 +430,7 @@ async def main():
     print(USAGE_GUIDE)
 
     # 載入設定
-    start_coords, end_coords, default_speed = load_config()
+    start_coords, end_coords, default_speed, frequent_locations = load_config()
 
     provider, is_ios17 = await get_device_provider()
     spoofer = Spoofy(provider, is_ios17)
@@ -438,6 +441,8 @@ async def main():
             print(f"1. 常用起點 -> 常用終點 (行走模擬) - 預設時速 {default_speed} km/h")
             print("2. 手動輸入單一座標 (適合從 Google Maps 複製貼上)")
             print("3. 自訂導航移動 (輸入兩點座標及時速)")
+            if frequent_locations:
+                print("4. 傳送到常用地點")
             print("q. 離開程式")
 
             choice = input("輸入功能編號: ").strip().lower()
@@ -448,6 +453,17 @@ async def main():
                 await spoofer.manual_input_teleport()
             elif choice == "3":
                 await spoofer.custom_walk()
+            elif choice == "4" and frequent_locations:
+                print("\n📍 常用地點：")
+                for i, loc in enumerate(frequent_locations):
+                    print(f"[{i + 1}] {loc['name']} ({loc['coords'][0]}, {loc['coords'][1]})")
+                
+                sel = input(f"請選擇地點 (1-{len(frequent_locations)}) 或 0 取消: ").strip()
+                if sel.isdigit():
+                    idx = int(sel) - 1
+                    if 0 <= idx < len(frequent_locations):
+                        target = frequent_locations[idx]
+                        await spoofer.teleport(target["coords"][0], target["coords"][1])
             elif choice == "q":
                 print("程式結束。")
                 break

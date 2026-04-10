@@ -177,7 +177,7 @@ class App(ctk.CTk):
         super().__init__()
 
         self.title("Spoofy GUI - iPhone 定位模擬器")
-        self.geometry("700x550")
+        self.geometry("700x600")
         ctk.set_appearance_mode("dark")
         ctk.set_default_color_theme("blue")
 
@@ -185,12 +185,12 @@ class App(ctk.CTk):
         self.loop = None
         self.spoofer = None
         self.current_task = None
-        self.start_coords, self.end_coords, self.default_speed = load_config()
+        self.start_coords, self.end_coords, self.default_speed, self.frequent_locations = load_config()
         self.log_queue = queue.Queue()
 
         # UI 佈局
         self.grid_columnconfigure(0, weight=1)
-        self.grid_rowconfigure(2, weight=1)
+        self.grid_rowconfigure(4, weight=1)
 
         # 1. 頂部狀態欄
         self.status_frame = ctk.CTkFrame(self)
@@ -277,9 +277,33 @@ class App(ctk.CTk):
         )
         self.walk_btn.grid(row=2, column=2, padx=10, pady=10)
 
-        # 3. 日誌區域
+        # 3. 常用地點選單
+        self.freq_label = ctk.CTkLabel(self.control_frame, text="📍 常用地點:")
+        self.freq_label.grid(row=3, column=0, padx=10, pady=10)
+
+        self.freq_options = (
+            [loc["name"] for loc in self.frequent_locations]
+            if self.frequent_locations
+            else ["尚無常用地點"]
+        )
+        self.freq_menu = ctk.CTkOptionMenu(
+            self.control_frame,
+            values=self.freq_options,
+            width=250,
+        )
+        self.freq_menu.grid(row=3, column=1, padx=10, pady=10)
+
+        self.freq_go_btn = ctk.CTkButton(
+            self.control_frame,
+            text="📍 傳送到此處",
+            command=self.go_frequent,
+            state="disabled",
+        )
+        self.freq_go_btn.grid(row=3, column=2, padx=10, pady=10)
+
+        # 4. 日誌區域
         self.log_text = ctk.CTkTextbox(self, width=600, height=200)
-        self.log_text.grid(row=2, column=0, padx=20, pady=(10, 20), sticky="nsew")
+        self.log_text.grid(row=4, column=0, padx=20, pady=(10, 20), sticky="nsew")
         self.log_text.insert(
             "0.0", "歡迎使用 Spoofy GUI！\n請先確認 iPhone 已連接並點擊「開始連線」。\n"
         )
@@ -349,6 +373,8 @@ class App(ctk.CTk):
         self.teleport_btn.configure(state="normal")
         self.walk_btn.configure(state="normal")
         self.stop_btn.configure(state="normal")
+        if self.frequent_locations:
+            self.freq_go_btn.configure(state="normal")
 
     def update_speed_label(self, value):
         self.speed_label.configure(text=f"時速: {int(value)} km/h")
@@ -368,6 +394,20 @@ class App(ctk.CTk):
         if self.spoofer:
             self.log(f"🏢 準備前往常用終點...")
             self.run_action(self.spoofer.teleport(*self.end_coords))
+
+    def go_frequent(self):
+        if not self.spoofer or not self.frequent_locations:
+            return
+
+        selected_name = self.freq_menu.get()
+        target = next(
+            (loc for loc in self.frequent_locations if loc["name"] == selected_name),
+            None,
+        )
+
+        if target:
+            self.log(f"📍 準備前往常用地點: {target['name']}...")
+            self.run_action(self.spoofer.teleport(*target["coords"]))
 
     def manual_teleport(self):
         raw = self.coord_entry.get()
