@@ -28,34 +28,6 @@ else:
     import termios
     import select
 
-USAGE_GUIDE = """
-========================================================================
-🚀 iPhone 定位模擬器 (iOS 16 & iOS 17+ 支援) 🚀
-========================================================================
-
-【使用前準備】
-1. 請確認您的 iPhone 已透過 USB 連接至電腦，並且已經「解鎖」及「信任此電腦」。
-2. 若您的 iPhone 為 iOS 17 或以上版本：
-   - 您必須開啟一個「新的終端機視窗」執行以下指令：
-     sudo python3 -m pymobiledevice3 remote tunneld
-   - 保持該視窗開啟，再回到這個視窗執行本程式。
-3. 執行本程式的指令：
-   python3 spoofy.py
-
-【功能說明】
-[1] 兩點導航移動：模擬從 A 點走到 B 點的移動過程 (預設常用起點到常用終點)。
-[2] 手動輸入座標：最精準！直接貼上 Google Maps 複製的數字。
-[3] 自訂導航移動：手動輸入起點、終點座標以及時速，進行自訂導航。
-
-【關於定位鎖定 (防亂跳)】
-- 執行瞬間移動後，程式會進入「鎖定模式」持續穩定座標。
-- 若要解除鎖定或切換地點，只需在終端機按下 [Enter] 鍵即可回到主選單。
-
-【如何恢復真實定位？】
-- 將 iPhone 重新開機即可完全恢復正常。
-========================================================================
-"""
-
 
 class Spoofy:
     def __init__(self, provider, is_ios17):
@@ -400,7 +372,7 @@ def load_config():
         "start": [25.027718192429898, 121.54652202461413],
         "end": [25.127024499013306, 121.47395879902238],
         "speed": 19.0,
-        "frequent_locations": []
+        "frequent_locations": [],
     }
 
     config_path = os.path.join(os.path.dirname(__file__), "config.json")
@@ -413,7 +385,9 @@ def load_config():
                     tuple(config.get("start", default_config["start"])),
                     tuple(config.get("end", default_config["end"])),
                     float(config.get("speed", default_config["speed"])),
-                    config.get("frequent_locations", default_config["frequent_locations"])
+                    config.get(
+                        "frequent_locations", default_config["frequent_locations"]
+                    ),
                 )
         except Exception as e:
             print(f"⚠️ 讀取設定檔發生錯誤: {e}，將使用預設座標。")
@@ -422,12 +396,15 @@ def load_config():
         tuple(default_config["start"]),
         tuple(default_config["end"]),
         default_config["speed"],
-        default_config["frequent_locations"]
+        default_config["frequent_locations"],
     )
 
 
 async def main():
-    print(USAGE_GUIDE)
+    print("========================================================================")
+    print("🚀 iPhone 定位模擬器 (Spoofy)")
+    print("👉 詳細使用說明請參考專案中的 README.md")
+    print("========================================================================")
 
     # 載入設定
     start_coords, end_coords, default_speed, frequent_locations = load_config()
@@ -456,9 +433,13 @@ async def main():
             elif choice == "4" and frequent_locations:
                 print("\n📍 常用地點：")
                 for i, loc in enumerate(frequent_locations):
-                    print(f"[{i + 1}] {loc['name']} ({loc['coords'][0]}, {loc['coords'][1]})")
-                
-                sel = input(f"請選擇地點 (1-{len(frequent_locations)}) 或 0 取消: ").strip()
+                    print(
+                        f"[{i + 1}] {loc['name']} ({loc['coords'][0]}, {loc['coords'][1]})"
+                    )
+
+                sel = input(
+                    f"請選擇地點 (1-{len(frequent_locations)}) 或 0 取消: "
+                ).strip()
                 if sel.isdigit():
                     idx = int(sel) - 1
                     if 0 <= idx < len(frequent_locations):
