@@ -6,9 +6,12 @@ import re
 import queue
 import urllib.request
 import urllib.parse
+import ssl
+import certifi
 import customtkinter as ctk
 from datetime import datetime, timedelta
 from geopy.distance import geodesic
+from geopy.geocoders import Nominatim
 
 # 從原本的檔案只匯入取得連線的方法與設定
 from spoofy import get_device_provider, load_config
@@ -21,6 +24,26 @@ class GUISpoofy:
         self.provider = provider
         self.is_ios17 = is_ios17
         self.log = log_callback
+
+    async def search_location(self, query):
+        """搜尋地點名稱並回傳結果列表"""
+        self.log(f"🔍 正在搜尋 '{query}' ...")
+        ctx = ssl.create_default_context(cafile=certifi.where())
+        geolocator = Nominatim(user_agent="spoofy_gui", ssl_context=ctx)
+
+        try:
+            results = await asyncio.to_thread(
+                geolocator.geocode, query, exactly_one=False, limit=10
+            )
+            if results:
+                return [
+                    {"address": r.address, "lat": r.latitude, "lng": r.longitude}
+                    for r in results
+                ]
+            return []
+        except Exception as e:
+            self.log(f"❌ 搜尋失敗: {e}")
+            return []
 
     async def get_route(self, start_coords, end_coords):
         """取得兩點間的真實路徑座標點 (使用 OSRM 公開 API)"""
@@ -65,7 +88,6 @@ class GUISpoofy:
                     self.log(
                         "🔒 定位已鎖定 (iPhone 不會亂跳)。\n若要解除或更改，請直接點擊其他按鈕或停止。"
                     )
-                    # 使用 sleep 取代 input，保持 async with 不結束
                     await asyncio.sleep(86400)
             else:
                 from pymobiledevice3.services.simulate_location import (
@@ -158,7 +180,6 @@ class GUISpoofy:
                     cur_lng = p1[1] + (p2[1] - p1[1]) * ratio
                     await loc_service.set(cur_lat, cur_lng)
 
-                    # 每 3 秒印一次日誌
                     if int(elapsed) % 3 == 0:
                         self.log(
                             f"進度 {current_dist / total_dist * 100:.1f}% | 當前: {cur_lat:.5f}, {cur_lng:.5f}"
@@ -177,7 +198,7 @@ class App(ctk.CTk):
         super().__init__()
 
         self.title("Spoofy GUI - iPhone 定位模擬器")
-        self.geometry("700x600")
+        self.geometry("750x750")
         ctk.set_appearance_mode("dark")
         ctk.set_default_color_theme("blue")
 
@@ -185,12 +206,18 @@ class App(ctk.CTk):
         self.loop = None
         self.spoofer = None
         self.current_task = None
-        self.start_coords, self.end_coords, self.default_speed, self.frequent_locations = load_config()
+        self.search_results = []
+        (
+            self.start_coords,
+            self.end_coords,
+            self.default_speed,
+            self.frequent_locations,
+        ) = load_config()
         self.log_queue = queue.Queue()
 
         # UI 佈局
         self.grid_columnconfigure(0, weight=1)
-        self.grid_rowconfigure(4, weight=1)
+        self.grid_rowconfigure(5, weight=1)
 
         # 1. 頂部狀態欄
         self.status_frame = ctk.CTkFrame(self)
@@ -211,23 +238,36 @@ class App(ctk.CTk):
         # 2. 控制面板
         self.control_frame = ctk.CTkFrame(self)
         self.control_frame.grid(row=1, column=0, padx=20, pady=10, sticky="nsew")
-        self.control_frame.grid_columnconfigure((0, 1, 2), weight=1)
+        self.control_frame.grid_columnconfigure((0, 1, 2, 3), weight=1)
 
         self.home_btn = ctk.CTkButton(
             self.control_frame,
-            text="🏠 前往起點",
+            text="🏠 起點傳送",
             command=self.go_home,
             state="disabled",
+            width=100,
         )
-        self.home_btn.grid(row=0, column=0, padx=10, pady=10)
+        self.home_btn.grid(row=0, column=0, padx=5, pady=10)
 
         self.comp_btn = ctk.CTkButton(
             self.control_frame,
-            text="🏢 前往終點",
+            text="🏢 終點傳送",
             command=self.go_company,
             state="disabled",
+            width=100,
         )
-        self.comp_btn.grid(row=0, column=1, padx=10, pady=10)
+        self.comp_btn.grid(row=0, column=1, padx=5, pady=10)
+
+        self.walk_home_comp_btn = ctk.CTkButton(
+            self.control_frame,
+            text="🚶 起點➔終點行走",
+            command=self.go_walk_home_comp,
+            state="disabled",
+            fg_color="seagreen",
+            hover_color="darkgreen",
+            width=150,
+        )
+        self.walk_home_comp_btn.grid(row=0, column=2, padx=5, pady=10)
 
         self.stop_btn = ctk.CTkButton(
             self.control_frame,
@@ -236,15 +276,16 @@ class App(ctk.CTk):
             hover_color="darkred",
             command=self.stop_action,
             state="disabled",
+            width=100,
         )
-        self.stop_btn.grid(row=0, column=2, padx=10, pady=10)
+        self.stop_btn.grid(row=0, column=3, padx=5, pady=10)
 
         self.coord_entry = ctk.CTkEntry(
             self.control_frame,
             placeholder_text="貼上座標 (例如: 25.0339, 121.5644)",
-            width=400,
+            width=300,
         )
-        self.coord_entry.grid(row=1, column=0, columnspan=2, padx=10, pady=10)
+        self.coord_entry.grid(row=1, column=0, columnspan=2, padx=5, pady=10)
 
         self.teleport_btn = ctk.CTkButton(
             self.control_frame,
@@ -252,12 +293,20 @@ class App(ctk.CTk):
             command=self.manual_teleport,
             state="disabled",
         )
-        self.teleport_btn.grid(row=1, column=2, padx=10, pady=10)
+        self.teleport_btn.grid(row=1, column=2, padx=5, pady=10)
+
+        self.walk_btn = ctk.CTkButton(
+            self.control_frame,
+            text="🚶 行走到此處",
+            command=self.start_walk,
+            state="disabled",
+        )
+        self.walk_btn.grid(row=1, column=3, padx=5, pady=10)
 
         self.speed_label = ctk.CTkLabel(
             self.control_frame, text=f"時速: {self.default_speed} km/h"
         )
-        self.speed_label.grid(row=2, column=0, padx=10, pady=0)
+        self.speed_label.grid(row=2, column=0, padx=5, pady=0)
 
         self.speed_slider = ctk.CTkSlider(
             self.control_frame,
@@ -267,63 +316,149 @@ class App(ctk.CTk):
             command=self.update_speed_label,
         )
         self.speed_slider.set(self.default_speed)
-        self.speed_slider.grid(row=2, column=1, padx=10, pady=0)
-
-        self.walk_btn = ctk.CTkButton(
-            self.control_frame,
-            text="🚶 開始行走 (到點)",
-            command=self.start_walk,
-            state="disabled",
+        self.speed_slider.grid(
+            row=2, column=1, columnspan=3, padx=5, pady=0, sticky="ew"
         )
-        self.walk_btn.grid(row=2, column=2, padx=10, pady=10)
 
-        # 3. 常用地點選單
-        self.freq_label = ctk.CTkLabel(self.control_frame, text="📍 常用地點:")
-        self.freq_label.grid(row=3, column=0, padx=10, pady=10)
-
+        # 3. 常用地點
+        ctk.CTkLabel(self.control_frame, text="📍 常用地點:").grid(
+            row=3, column=0, padx=5, pady=10
+        )
         self.freq_options = (
             [loc["name"] for loc in self.frequent_locations]
             if self.frequent_locations
             else ["尚無常用地點"]
         )
         self.freq_menu = ctk.CTkOptionMenu(
-            self.control_frame,
-            values=self.freq_options,
-            width=250,
+            self.control_frame, values=self.freq_options, width=200
         )
-        self.freq_menu.grid(row=3, column=1, padx=10, pady=10)
-
+        self.freq_menu.grid(row=3, column=1, columnspan=2, padx=5, pady=10)
         self.freq_go_btn = ctk.CTkButton(
             self.control_frame,
-            text="📍 傳送到此處",
+            text="📍 前往常用",
             command=self.go_frequent,
             state="disabled",
         )
-        self.freq_go_btn.grid(row=3, column=2, padx=10, pady=10)
+        self.freq_go_btn.grid(row=3, column=3, padx=5, pady=10)
 
-        # 4. 日誌區域
-        self.log_text = ctk.CTkTextbox(self, width=600, height=200)
-        self.log_text.grid(row=4, column=0, padx=20, pady=(10, 20), sticky="nsew")
-        self.log_text.insert(
-            "0.0", "歡迎使用 Spoofy GUI！\n請先確認 iPhone 已連接並點擊「開始連線」。\n"
+        # 4. 地點搜尋
+        self.search_entry = ctk.CTkEntry(
+            self.control_frame,
+            placeholder_text="搜尋地點名稱 (例如: 東京迪士尼)",
+            width=200,
         )
+        self.search_entry.grid(row=4, column=0, padx=5, pady=10)
+        self.search_btn = ctk.CTkButton(
+            self.control_frame,
+            text="🔍 搜尋",
+            command=self.search_location_ui,
+            state="disabled",
+            width=80,
+        )
+        self.search_btn.grid(row=4, column=1, padx=5, pady=10)
+        self.search_result_menu = ctk.CTkOptionMenu(
+            self.control_frame, values=["搜尋結果"], width=150
+        )
+        self.search_result_menu.grid(row=4, column=2, padx=5, pady=10)
+        self.search_go_btn = ctk.CTkButton(
+            self.control_frame,
+            text="🚀 前往結果",
+            command=self.go_search_result,
+            state="disabled",
+            width=100,
+        )
+        self.search_go_btn.grid(row=4, column=3, padx=5, pady=10)
 
-        # 啟動背景事件迴圈
+        # 5. 日誌區域
+        self.log_text = ctk.CTkTextbox(self, width=600, height=200)
+        self.log_text.grid(row=5, column=0, padx=20, pady=(10, 20), sticky="nsew")
+        self.log_text.insert("0.0", "歡迎使用 Spoofy GUI！\n請點擊「開始連線」。\n")
+
         self.start_async_loop()
         self.check_logs()
+        self.bind_macos_shortcuts()
 
-    # --- 非同步處理相關 ---
+    def bind_macos_shortcuts(self):
+        import tkinter as tk
+
+        # macOS 原生選單仍保留，但僅作顯示用，不掛載自定義指令，避免與元件層級的綁定衝突
+        try:
+            menubar = tk.Menu(self)
+            edit_menu = tk.Menu(menubar, tearoff=0)
+            edit_menu.add_command(label="Cut", accelerator="Cmd+X")
+            edit_menu.add_command(label="Copy", accelerator="Cmd+C")
+            edit_menu.add_command(label="Paste", accelerator="Cmd+V")
+            edit_menu.add_command(label="Select All", accelerator="Cmd+A")
+            menubar.add_cascade(label="Edit", menu=edit_menu)
+            self.config(menu=menubar)
+        except Exception as e:
+            self.log(f"系統選單建立失敗: {e}")
+
+        # 核心剪貼簿與選取處理函式
+        def handle_cut(event):
+            event.widget.event_generate("<<Cut>>")
+            return "break"
+
+        def handle_copy(event):
+            event.widget.event_generate("<<Copy>>")
+            return "break"
+
+        def handle_paste(event):
+            event.widget.event_generate("<<Paste>>")
+            return "break"
+
+        def handle_select_all(event):
+            event.widget.event_generate("<<SelectAll>>")
+            return "break"
+
+        def handle_cmd_backspace(event):
+            try:
+                if hasattr(event.widget, "delete"):
+                    event.widget.delete(0, "end")
+                return "break"
+            except:
+                pass
+
+        # === 精準綁定：只綁定到特定的輸入框，避免全域 (bind_all) 帶來的重複或遺失問題 ===
+        entries = [self.coord_entry, self.search_entry]
+        for entry in entries:
+            # 為了保險，同時綁定 Command 和 Meta，因為 Tkinter 在不同 macOS 版本下識別可能不同
+            entry.bind("<Command-x>", handle_cut)
+            entry.bind("<Command-c>", handle_copy)
+            entry.bind("<Command-v>", handle_paste)
+            entry.bind("<Command-a>", handle_select_all)
+            entry.bind("<Command-BackSpace>", handle_cmd_backspace)
+
+            entry.bind("<Meta-x>", handle_cut)
+            entry.bind("<Meta-c>", handle_copy)
+            entry.bind("<Meta-v>", handle_paste)
+            entry.bind("<Meta-a>", handle_select_all)
+            entry.bind("<Meta-BackSpace>", handle_cmd_backspace)
+
+        # 針對輸入框增加右鍵選單
+        def show_menu(event):
+            m = tk.Menu(self, tearoff=0)
+            m.add_command(
+                label="貼上", command=lambda: event.widget.event_generate("<<Paste>>")
+            )
+            m.tk_popup(event.x_root, event.y_root)
+
+        self.coord_entry.bind(
+            "<Button-2>" if os.name == "posix" else "<Button-3>", show_menu
+        )
+        self.search_entry.bind(
+            "<Button-2>" if os.name == "posix" else "<Button-3>", show_menu
+        )
+
     def start_async_loop(self):
         def run_loop():
             self.loop = asyncio.new_event_loop()
             asyncio.set_event_loop(self.loop)
             self.loop.run_forever()
 
-        t = threading.Thread(target=run_loop, daemon=True)
-        t.start()
+        threading.Thread(target=run_loop, daemon=True).start()
 
     def run_action(self, coro):
-        """執行一個新的動作前，先取消掉前一個正在進行的任務 (例如取消鎖定狀態)"""
         if self.current_task:
             self.loop.call_soon_threadsafe(self.current_task.cancel)
 
@@ -345,7 +480,6 @@ class App(ctk.CTk):
             self.log_text.see("end")
         self.after(100, self.check_logs)
 
-    # --- 功能邏輯 ---
     def start_connection(self):
         self.log("正在嘗試連線至裝置...")
         self.connect_btn.configure(state="disabled", text="連線中...")
@@ -368,11 +502,16 @@ class App(ctk.CTk):
     def on_connected(self):
         self.status_label.configure(text="🟢 已連線", text_color="green")
         self.connect_btn.configure(text="重新連線", state="normal")
-        self.home_btn.configure(state="normal")
-        self.comp_btn.configure(state="normal")
-        self.teleport_btn.configure(state="normal")
-        self.walk_btn.configure(state="normal")
-        self.stop_btn.configure(state="normal")
+        for btn in [
+            self.home_btn,
+            self.comp_btn,
+            self.walk_home_comp_btn,
+            self.teleport_btn,
+            self.walk_btn,
+            self.stop_btn,
+            self.search_btn,
+        ]:
+            btn.configure(state="normal")
         if self.frequent_locations:
             self.freq_go_btn.configure(state="normal")
 
@@ -387,24 +526,76 @@ class App(ctk.CTk):
 
     def go_home(self):
         if self.spoofer:
-            self.log(f"🏠 準備前往常用起點...")
+            self.log(f"🏠 準備傳送到常用起點...")
             self.run_action(self.spoofer.teleport(*self.start_coords))
 
     def go_company(self):
         if self.spoofer:
-            self.log(f"🏢 準備前往常用終點...")
+            self.log(f"🏢 準備傳送到常用終點...")
             self.run_action(self.spoofer.teleport(*self.end_coords))
+
+    def go_walk_home_comp(self):
+        if self.spoofer:
+            speed = self.speed_slider.get()
+            self.log(f"🚶 準備從起點行走至終點 (時速 {int(speed)} km/h)...")
+            self.run_action(
+                self.spoofer.walk(self.start_coords, self.end_coords, speed_kmh=speed)
+            )
+
+    def search_location_ui(self):
+        query = self.search_entry.get().strip()
+        if not query:
+            return
+
+        async def _search():
+            results = await self.spoofer.search_location(query)
+            if results:
+                self.search_results = results
+                names = [
+                    (
+                        r["address"][:50] + "..."
+                        if len(r["address"]) > 50
+                        else r["address"]
+                    )
+                    for r in results
+                ]
+                self.after(0, lambda: self.search_result_menu.configure(values=names))
+                self.after(0, lambda: self.search_go_btn.configure(state="normal"))
+                self.log(f"✅ 找到 {len(results)} 個結果，請選擇後點擊「前往結果」。")
+            else:
+                self.log("❌ 找不到該地點。")
+
+        asyncio.run_coroutine_threadsafe(_search(), self.loop)
+
+    def go_search_result(self):
+        if not self.search_results:
+            return
+        selected_name = self.search_result_menu.get()
+        target = next(
+            (
+                r
+                for r in self.search_results
+                if (
+                    r["address"][:50] + "..."
+                    if len(r["address"]) > 50
+                    else r["address"]
+                )
+                == selected_name
+            ),
+            None,
+        )
+        if target:
+            self.log(f"🚀 準備前往搜尋結果: {target['address'][:30]}...")
+            self.run_action(self.spoofer.teleport(target["lat"], target["lng"]))
 
     def go_frequent(self):
         if not self.spoofer or not self.frequent_locations:
             return
-
         selected_name = self.freq_menu.get()
         target = next(
             (loc for loc in self.frequent_locations if loc["name"] == selected_name),
             None,
         )
-
         if target:
             self.log(f"📍 準備前往常用地點: {target['name']}...")
             self.run_action(self.spoofer.teleport(*target["coords"]))
@@ -413,8 +604,7 @@ class App(ctk.CTk):
         raw = self.coord_entry.get()
         coords = re.findall(r"[-+]?\d*\.\d+|\d+", raw)
         if len(coords) >= 2:
-            lat, lng = float(coords[0]), float(coords[1])
-            self.run_action(self.spoofer.teleport(lat, lng))
+            self.run_action(self.spoofer.teleport(float(coords[0]), float(coords[1])))
         else:
             self.log("❌ 座標格式錯誤。")
 
@@ -422,16 +612,15 @@ class App(ctk.CTk):
         raw = self.coord_entry.get()
         coords = re.findall(r"[-+]?\d*\.\d+|\d+", raw)
         if len(coords) >= 2:
-            dest_coords = (float(coords[0]), float(coords[1]))
-            speed = self.speed_slider.get()
-            # 簡化：從常用起點走到目的地
+            dest = (float(coords[0]), float(coords[1]))
             self.run_action(
-                self.spoofer.walk(self.start_coords, dest_coords, speed_kmh=speed)
+                self.spoofer.walk(
+                    self.start_coords, dest, speed_kmh=self.speed_slider.get()
+                )
             )
         else:
             self.log("❌ 請先在輸入框貼上「終點」座標。")
 
 
 if __name__ == "__main__":
-    app = App()
-    app.mainloop()
+    App().mainloop()
