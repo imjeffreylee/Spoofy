@@ -1,7 +1,5 @@
 import asyncio
 import sys
-import ssl
-import certifi
 import re
 import platform
 import json
@@ -11,7 +9,6 @@ import urllib.parse
 import webbrowser
 from datetime import datetime, timedelta
 from geopy.distance import geodesic
-from geopy.geocoders import Nominatim
 from pymobiledevice3.lockdown import create_using_usbmux
 from pymobiledevice3.services.simulate_location import DtSimulateLocation
 from pymobiledevice3.services.dvt.instruments.location_simulation import (
@@ -100,7 +97,7 @@ class Spoofy:
             return None
 
     async def walk(self, start_coords, end_coords, speed_kmh=5.0):
-        """功能 2：模擬兩點間行走 (支援真實道路導航)"""
+        """功能 1：模擬兩點間行走 (支援真實道路導航)"""
         print("\n🔍 正在規劃真實道路路徑...")
         path = await self.get_route(start_coords, end_coords)
 
@@ -219,42 +216,8 @@ class Spoofy:
             if not IS_WINDOWS:
                 termios.tcsetattr(fd, termios.TCSADRAIN, old_settings)
 
-    async def search_and_teleport(self):
-        """功能 3：搜尋地點名稱"""
-        query = input("\n請輸入想要搜尋的地點名稱 (例如：東京迪士尼)：")
-        if not query.strip():
-            return
-
-        print(f"🔍 正在搜尋 '{query}' ...")
-        ctx = ssl.create_default_context(cafile=certifi.where())
-        geolocator = Nominatim(user_agent="spoofy_cli", ssl_context=ctx)
-
-        try:
-            results = await asyncio.to_thread(
-                geolocator.geocode, query, exactly_one=False, limit=10
-            )
-        except Exception as e:
-            print(f"❌ 搜尋時發生錯誤: {e}")
-            return
-
-        if not results:
-            print("❌ 找不到地點。")
-            return
-
-        print("\n📍 搜尋結果：")
-        for i, location in enumerate(results):
-            print(f"[{i + 1}] {location.address}")
-
-        try:
-            selection = input(f"\n請輸入編號 (1-{len(results)}) 或 0 取消: ")
-            idx = int(selection) - 1
-            if idx >= 0 and idx < len(results):
-                await self.teleport(results[idx].latitude, results[idx].longitude)
-        except ValueError:
-            print("❌ 輸入無效。")
-
     async def manual_input_teleport(self):
-        """功能 4：手動輸入座標 (支援 Google Maps 格式)"""
+        """功能 2：手動輸入座標 (支援 Google Maps 格式)"""
         print("\n📍 請貼上座標 (格式如: 25.0339, 121.5644)")
         raw_input = input("座標：").strip()
 
