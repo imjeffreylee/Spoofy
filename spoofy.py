@@ -8,6 +8,7 @@ import json
 import os
 import urllib.request
 import urllib.parse
+import webbrowser
 from datetime import datetime, timedelta
 from geopy.distance import geodesic
 from geopy.geocoders import Nominatim
@@ -34,6 +35,14 @@ class Spoofy:
         self.provider = provider
         self.is_ios17 = is_ios17
         print(f"成功連線至裝置 (iOS 17+: {is_ios17})")
+
+    def preview_route(self, start_coords, end_coords):
+        """在瀏覽器中開啟 Google Maps 預覽路徑"""
+        start_lat, start_lng = start_coords
+        end_lat, end_lng = end_coords
+        url = f"https://www.google.com/maps/dir/?api=1&origin={start_lat},{start_lng}&destination={end_lat},{end_lng}&travelmode=bicycling"
+        print(f"\n🔗 正在開啟瀏覽器預覽路徑...")
+        webbrowser.open(url)
 
     async def teleport(self, lat, lng):
         """核心功能：執行定位修改並保持連線鎖定"""
@@ -313,7 +322,16 @@ class Spoofy:
         print(
             f"解析成功：從 ({start_lat}, {start_lng}) 導航至 ({end_lat}, {end_lng})，時速 {speed} km/h"
         )
-        await self.walk((start_lat, start_lng), (end_lat, end_lng), speed_kmh=speed)
+        
+        print("\n請選擇：")
+        print("1. 預覽路徑 (在瀏覽器中開啟 Google Maps)")
+        print("2. 開始導航")
+        sub_choice = input("請選擇 (預設為 2): ").strip()
+        
+        if sub_choice == "1":
+            self.preview_route((start_lat, start_lng), (end_lat, end_lng))
+        else:
+            await self.walk((start_lat, start_lng), (end_lat, end_lng), speed_kmh=speed)
 
     def _check_mount_error(self, error):
         if "ImageMount" in str(error) or "InvalidService" in str(error):
@@ -440,7 +458,15 @@ async def main():
             choice = input("輸入功能編號: ").strip().lower()
 
             if choice == "1":
-                await spoofer.walk(start_coords, end_coords, speed_kmh=default_speed)
+                print("\n請選擇：")
+                print("1. 預覽路徑 (在瀏覽器中開啟 Google Maps)")
+                print("2. 開始導航")
+                sub_choice = input("請選擇 (預設為 2): ").strip()
+                
+                if sub_choice == "1":
+                    spoofer.preview_route(start_coords, end_coords)
+                else:
+                    await spoofer.walk(start_coords, end_coords, speed_kmh=default_speed)
             elif choice == "2":
                 await spoofer.manual_input_teleport()
             elif choice == "3":
