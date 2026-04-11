@@ -232,7 +232,9 @@ class App(ctk.CTk):
         self.control_frame.grid(row=1, column=0, padx=20, pady=10, sticky="nsew")
         self.control_frame.grid_columnconfigure((0, 1, 2, 3, 4), weight=1)
 
-        start_name = self.start_data["name"] if isinstance(self.start_data, dict) else "起點"
+        start_name = (
+            self.start_data["name"] if isinstance(self.start_data, dict) else "起點"
+        )
         end_name = self.end_data["name"] if isinstance(self.end_data, dict) else "終點"
 
         self.walk_home_comp_btn = ctk.CTkButton(
@@ -351,9 +353,13 @@ class App(ctk.CTk):
 
         # 5. 當前座標顯示
         self.current_coord_label = ctk.CTkLabel(
-            self.control_frame, text="📍 當前模擬位置: 尚未連線", font=("Microsoft JhengHei", 12, "bold")
+            self.control_frame,
+            text="📍 當前模擬位置: 尚未連線",
+            font=("Microsoft JhengHei", 12, "bold"),
         )
-        self.current_coord_label.grid(row=5, column=0, columnspan=5, padx=20, pady=5, sticky="w")
+        self.current_coord_label.grid(
+            row=5, column=0, columnspan=5, padx=20, pady=5, sticky="w"
+        )
 
         # 6. 日誌區域
         self.log_text = ctk.CTkTextbox(self, width=600, height=200)
@@ -476,7 +482,9 @@ class App(ctk.CTk):
         async def connect():
             try:
                 provider, is_ios17 = await get_device_provider()
-                self.spoofer = GUISpoofy(provider, is_ios17, self.log, self.start_coords)
+                self.spoofer = GUISpoofy(
+                    provider, is_ios17, self.log, self.start_coords
+                )
                 self.after(0, self.on_connected)
                 self.log(f"✅ 連線成功 (iOS 17+: {is_ios17})")
             except Exception as e:
@@ -516,9 +524,15 @@ class App(ctk.CTk):
     def go_walk_home_comp(self):
         if self.spoofer:
             speed = self.speed_slider.get()
-            start_name = self.start_data["name"] if isinstance(self.start_data, dict) else "起點"
-            end_name = self.end_data["name"] if isinstance(self.end_data, dict) else "終點"
-            self.log(f"🚶 準備從 {start_name} 行走至 {end_name} (時速 {int(speed)} km/h)...")
+            start_name = (
+                self.start_data["name"] if isinstance(self.start_data, dict) else "起點"
+            )
+            end_name = (
+                self.end_data["name"] if isinstance(self.end_data, dict) else "終點"
+            )
+            self.log(
+                f"🚶 準備從 {start_name} 行走至 {end_name} (時速 {int(speed)} km/h)..."
+            )
             self.run_action(
                 self.spoofer.walk(self.start_coords, self.end_coords, speed_kmh=speed)
             )

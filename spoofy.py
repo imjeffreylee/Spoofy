@@ -285,12 +285,12 @@ class Spoofy:
         print(
             f"解析成功：從 ({start_lat}, {start_lng}) 導航至 ({end_lat}, {end_lng})，時速 {speed} km/h"
         )
-        
+
         print("\n請選擇：")
         print("1. 預覽路徑 (在瀏覽器中開啟 Google Maps)")
         print("2. 開始導航")
         sub_choice = input("請選擇 (預設為 2): ").strip()
-        
+
         if sub_choice == "1":
             self.preview_route((start_lat, start_lng), (end_lat, end_lng))
         else:
@@ -350,7 +350,10 @@ async def get_device_provider():
 def load_config():
     """從 config.json 載入常用地點座標"""
     default_config = {
-        "start": {"name": "預設起點", "coords": [25.027718192429898, 121.54652202461413]},
+        "start": {
+            "name": "預設起點",
+            "coords": [25.027718192429898, 121.54652202461413],
+        },
         "end": {"name": "預設終點", "coords": [25.127024499013306, 121.47395879902238]},
         "speed": 19.0,
         "frequent_locations": [],
@@ -362,14 +365,20 @@ def load_config():
         try:
             with open(config_path, "r") as f:
                 config = json.load(f)
-                
+
                 start_data = config.get("start", default_config["start"])
                 # 相容舊格式 (如果是 list 直接當成 coords)
-                start_coords = start_data.get("coords") if isinstance(start_data, dict) else start_data
-                
+                start_coords = (
+                    start_data.get("coords")
+                    if isinstance(start_data, dict)
+                    else start_data
+                )
+
                 end_data = config.get("end", default_config["end"])
-                end_coords = end_data.get("coords") if isinstance(end_data, dict) else end_data
-                
+                end_coords = (
+                    end_data.get("coords") if isinstance(end_data, dict) else end_data
+                )
+
                 return (
                     tuple(start_coords),
                     tuple(end_coords),
@@ -378,7 +387,7 @@ def load_config():
                         "frequent_locations", default_config["frequent_locations"]
                     ),
                     start_data,
-                    end_data
+                    end_data,
                 )
         except Exception as e:
             print(f"⚠️ 讀取設定檔發生錯誤: {e}，將使用預設座標。")
@@ -389,7 +398,7 @@ def load_config():
         default_config["speed"],
         default_config["frequent_locations"],
         default_config["start"],
-        default_config["end"]
+        default_config["end"],
     )
 
 
@@ -400,18 +409,29 @@ async def main():
     print("========================================================================")
 
     # 載入設定
-    start_coords, end_coords, default_speed, frequent_locations, start_data, end_data = load_config()
+    (
+        start_coords,
+        end_coords,
+        default_speed,
+        frequent_locations,
+        start_data,
+        end_data,
+    ) = load_config()
 
     provider, is_ios17 = await get_device_provider()
     spoofer = Spoofy(provider, is_ios17)
 
     while True:
         try:
-            start_name = start_data["name"] if isinstance(start_data, dict) else "常用起點"
+            start_name = (
+                start_data["name"] if isinstance(start_data, dict) else "常用起點"
+            )
             end_name = end_data["name"] if isinstance(end_data, dict) else "常用終點"
-            
+
             print("\n請選擇功能：")
-            print(f"1. {start_name} -> {end_name} (行走模擬) - 預設時速 {default_speed} km/h")
+            print(
+                f"1. {start_name} -> {end_name} (行走模擬) - 預設時速 {default_speed} km/h"
+            )
             print("2. 手動輸入單一座標 (適合從 Google Maps 複製貼上)")
             print("3. 自訂導航移動 (輸入兩點座標及時速)")
             if frequent_locations:
@@ -425,11 +445,13 @@ async def main():
                 print("1. 預覽路徑 (在瀏覽器中開啟 Google Maps)")
                 print("2. 開始導航")
                 sub_choice = input("請選擇 (預設為 2): ").strip()
-                
+
                 if sub_choice == "1":
                     spoofer.preview_route(start_coords, end_coords)
                 else:
-                    await spoofer.walk(start_coords, end_coords, speed_kmh=default_speed)
+                    await spoofer.walk(
+                        start_coords, end_coords, speed_kmh=default_speed
+                    )
             elif choice == "2":
                 await spoofer.manual_input_teleport()
             elif choice == "3":
