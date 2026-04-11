@@ -212,6 +212,8 @@ class App(ctk.CTk):
             self.end_coords,
             self.default_speed,
             self.frequent_locations,
+            self.start_data,
+            self.end_data,
         ) = load_config()
         self.log_queue = queue.Queue()
 
@@ -240,9 +242,12 @@ class App(ctk.CTk):
         self.control_frame.grid(row=1, column=0, padx=20, pady=10, sticky="nsew")
         self.control_frame.grid_columnconfigure((0, 1, 2, 3), weight=1)
 
+        start_name = self.start_data["name"] if isinstance(self.start_data, dict) else "起點"
+        end_name = self.end_data["name"] if isinstance(self.end_data, dict) else "終點"
+
         self.home_btn = ctk.CTkButton(
             self.control_frame,
-            text="🏠 起點傳送",
+            text=f"🏠 {start_name}傳送",
             command=self.go_home,
             state="disabled",
             width=100,
@@ -251,7 +256,7 @@ class App(ctk.CTk):
 
         self.comp_btn = ctk.CTkButton(
             self.control_frame,
-            text="🏢 終點傳送",
+            text=f"🏢 {end_name}傳送",
             command=self.go_company,
             state="disabled",
             width=100,
@@ -260,7 +265,7 @@ class App(ctk.CTk):
 
         self.walk_home_comp_btn = ctk.CTkButton(
             self.control_frame,
-            text="🚶 起點➔終點行走",
+            text=f"🚶 {start_name}➔{end_name}行走",
             command=self.go_walk_home_comp,
             state="disabled",
             fg_color="seagreen",
@@ -526,18 +531,22 @@ class App(ctk.CTk):
 
     def go_home(self):
         if self.spoofer:
-            self.log(f"🏠 準備傳送到常用起點...")
+            start_name = self.start_data["name"] if isinstance(self.start_data, dict) else "常用起點"
+            self.log(f"🏠 準備傳送到 {start_name}...")
             self.run_action(self.spoofer.teleport(*self.start_coords))
 
     def go_company(self):
         if self.spoofer:
-            self.log(f"🏢 準備傳送到常用終點...")
+            end_name = self.end_data["name"] if isinstance(self.end_data, dict) else "常用終點"
+            self.log(f"🏢 準備傳送到 {end_name}...")
             self.run_action(self.spoofer.teleport(*self.end_coords))
 
     def go_walk_home_comp(self):
         if self.spoofer:
             speed = self.speed_slider.get()
-            self.log(f"🚶 準備從起點行走至終點 (時速 {int(speed)} km/h)...")
+            start_name = self.start_data["name"] if isinstance(self.start_data, dict) else "起點"
+            end_name = self.end_data["name"] if isinstance(self.end_data, dict) else "終點"
+            self.log(f"🚶 準備從 {start_name} 行走至 {end_name} (時速 {int(speed)} km/h)...")
             self.run_action(
                 self.spoofer.walk(self.start_coords, self.end_coords, speed_kmh=speed)
             )

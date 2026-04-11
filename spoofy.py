@@ -369,8 +369,8 @@ async def get_device_provider():
 def load_config():
     """從 config.json 載入常用地點座標"""
     default_config = {
-        "start": [25.027718192429898, 121.54652202461413],
-        "end": [25.127024499013306, 121.47395879902238],
+        "start": {"name": "預設起點", "coords": [25.027718192429898, 121.54652202461413]},
+        "end": {"name": "預設終點", "coords": [25.127024499013306, 121.47395879902238]},
         "speed": 19.0,
         "frequent_locations": [],
     }
@@ -381,22 +381,34 @@ def load_config():
         try:
             with open(config_path, "r") as f:
                 config = json.load(f)
+                
+                start_data = config.get("start", default_config["start"])
+                # 相容舊格式 (如果是 list 直接當成 coords)
+                start_coords = start_data.get("coords") if isinstance(start_data, dict) else start_data
+                
+                end_data = config.get("end", default_config["end"])
+                end_coords = end_data.get("coords") if isinstance(end_data, dict) else end_data
+                
                 return (
-                    tuple(config.get("start", default_config["start"])),
-                    tuple(config.get("end", default_config["end"])),
+                    tuple(start_coords),
+                    tuple(end_coords),
                     float(config.get("speed", default_config["speed"])),
                     config.get(
                         "frequent_locations", default_config["frequent_locations"]
                     ),
+                    start_data,
+                    end_data
                 )
         except Exception as e:
             print(f"⚠️ 讀取設定檔發生錯誤: {e}，將使用預設座標。")
 
     return (
-        tuple(default_config["start"]),
-        tuple(default_config["end"]),
+        tuple(default_config["start"]["coords"]),
+        tuple(default_config["end"]["coords"]),
         default_config["speed"],
         default_config["frequent_locations"],
+        default_config["start"],
+        default_config["end"]
     )
 
 
@@ -407,15 +419,18 @@ async def main():
     print("========================================================================")
 
     # 載入設定
-    start_coords, end_coords, default_speed, frequent_locations = load_config()
+    start_coords, end_coords, default_speed, frequent_locations, start_data, end_data = load_config()
 
     provider, is_ios17 = await get_device_provider()
     spoofer = Spoofy(provider, is_ios17)
 
     while True:
         try:
+            start_name = start_data["name"] if isinstance(start_data, dict) else "常用起點"
+            end_name = end_data["name"] if isinstance(end_data, dict) else "常用終點"
+            
             print("\n請選擇功能：")
-            print(f"1. 常用起點 -> 常用終點 (行走模擬) - 預設時速 {default_speed} km/h")
+            print(f"1. {start_name} -> {end_name} (行走模擬) - 預設時速 {default_speed} km/h")
             print("2. 手動輸入單一座標 (適合從 Google Maps 複製貼上)")
             print("3. 自訂導航移動 (輸入兩點座標及時速)")
             if frequent_locations:

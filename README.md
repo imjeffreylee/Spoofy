@@ -61,8 +61,8 @@ cp config.example.json config.json
 
 ```json
 {
-  "start": [25.0339, 121.5644],
-  "end": [25.0479, 121.5173],
+  "start": { "name": "台北 101", "coords": [25.0339, 121.5644] },
+  "end": { "name": "台北車站", "coords": [25.0479, 121.5173] },
   "speed": 19.0,
   "frequent_locations": [
     { "name": "台北 101", "coords": [25.0339, 121.5644] },
