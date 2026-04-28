@@ -114,7 +114,29 @@ class CLISpoofer:
         if input("請選擇 (預設為 2): ").strip() == "1":
             self.preview_route((start_lat, start_lng), (end_lat, end_lng))
         else:
+            save_last_navigation([start_lat, start_lng], [end_lat, end_lng], speed)
             await self.walk((start_lat, start_lng), (end_lat, end_lng), speed_kmh=speed)
+
+def save_last_navigation(start_coords, end_coords, speed):
+    """儲存最後一次導航資訊到 config.json"""
+    config_path = os.path.join(os.path.dirname(__file__), "config.json")
+    config = {}
+    if os.path.exists(config_path):
+        try:
+            with open(config_path, "r", encoding="utf-8") as f:
+                config = json.load(f)
+        except:
+            pass
+    config["last_navigation"] = {
+        "start_coords": start_coords,
+        "end_coords": end_coords,
+        "speed": speed
+    }
+    try:
+        with open(config_path, "w", encoding="utf-8") as f:
+            json.dump(config, f, indent=2, ensure_ascii=False)
+    except Exception as e:
+        print(f"⚠️ 儲存導航資訊失敗: {e}")
 
 def load_config():
     """從 config.json 載入常用地點座標"""
@@ -123,20 +145,25 @@ def load_config():
         "end": {"name": "預設終點", "coords": [25.127024499013306, 121.47395879902238]},
         "speed": 19.0,
         "frequent_locations": [],
+        "last_navigation": None
     }
     config_path = os.path.join(os.path.dirname(__file__), "config.json")
+    config = default_config.copy()
     if os.path.exists(config_path):
         try:
-            with open(config_path, "r") as f:
-                config = json.load(f)
-                start_data = config.get("start", default_config["start"])
-                start_coords = start_data.get("coords") if isinstance(start_data, dict) else start_data
-                end_data = config.get("end", default_config["end"])
-                end_coords = end_data.get("coords") if isinstance(end_data, dict) else end_data
-                return (tuple(start_coords), tuple(end_coords), float(config.get("speed", default_config["speed"])), config.get("frequent_locations", default_config["frequent_locations"]), start_data, end_data)
+            with open(config_path, "r", encoding="utf-8") as f:
+                config.update(json.load(f))
         except Exception as e:
-            print(f"⚠️ 讀取設定檔發生錯誤: {e}，將使用預設座標。")
-    return (tuple(default_config["start"]["coords"]), tuple(default_config["end"]["coords"]), default_config["speed"], default_config["frequent_locations"], default_config["start"], default_config["end"])
+            print(f"⚠️ 讀取設定檔發生錯誤: {e}")
+    
+    start_data = config.get("start", default_config["start"])
+    start_coords = start_data.get("coords") if isinstance(start_data, dict) else start_data
+    end_data = config.get("end", default_config["end"])
+    end_coords = end_data.get("coords") if isinstance(end_data, dict) else end_data
+    
+    return (tuple(start_coords), tuple(end_coords), float(config.get("speed", default_config["speed"])), 
+            config.get("frequent_locations", default_config["frequent_locations"]), start_data, end_data,
+            config.get("last_navigation"))
 
 async def main():
     print("========================================================================")
@@ -144,7 +171,7 @@ async def main():
     print("👉 詳細使用說明請參考專案中的 README.md")
     print("========================================================================")
 
-    start_coords, end_coords, default_speed, frequent_locations, start_data, end_data = load_config()
+    start_coords, end_coords, default_speed, frequent_locations, start_data, end_data, last_nav = load_config()
 
     try:
         provider, is_ios17 = await get_device_provider()
@@ -164,6 +191,7 @@ async def main():
             print("2. 手動輸入單一座標 (適合從 Google Maps 複製貼上)")
             print("3. 自訂導航移動 (輸入兩點座標及時速)")
             if frequent_locations: print("4. 傳送到常用地點")
+            if last_nav: print("5. 使用上次的導航")
             print("q. 離開程式")
 
             choice = input("輸入功能編號: ").strip().lower()
@@ -178,6 +206,8 @@ async def main():
                 await spoofer.manual_input_teleport()
             elif choice == "3":
                 await spoofer.custom_walk()
+                # 更新上次導航資訊，以便在選單中顯示
+                _, _, _, _, _, _, last_nav = load_config()
             elif choice == "4" and frequent_locations:
                 print("\n📍 常用地點：")
                 for i, loc in enumerate(frequent_locations):
@@ -186,6 +216,12 @@ async def main():
                 if sel.isdigit() and 0 <= int(sel) - 1 < len(frequent_locations):
                     target = frequent_locations[int(sel) - 1]
                     await spoofer.teleport(target["coords"][0], target["coords"][1])
+            elif choice == "5" and last_nav:
+                s = last_nav["start_coords"]
+                e = last_nav["end_coords"]
+                sp = last_nav["speed"]
+                print(f"\n🔄 使用上次導航：({s[0]}, {s[1]}) -> ({e[0]}, {e[1]})，時速 {sp} km/h")
+                await spoofer.walk(tuple(s), tuple(e), speed_kmh=sp)
             elif choice == "q":
                 break
         except KeyboardInterrupt:
