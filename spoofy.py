@@ -66,10 +66,10 @@ class CLISpoofer:
             except asyncio.CancelledError:
                 pass
 
-    async def walk(self, start_coords, end_coords, speed_kmh=5.0):
+    async def walk(self, start_coords, end_coords, speed_kmh=5.0, use_real_route=True):
         """CLI wrapper for walk, adding user input block for cancellation."""
         print("💡 【提示】在導航過程中，您可以隨時按下 `Enter` 鍵中斷導航。")
-        walk_task = asyncio.create_task(self.core.walk(start_coords, end_coords, speed_kmh))
+        walk_task = asyncio.create_task(self.core.walk(start_coords, end_coords, speed_kmh, use_real_route))
         try:
             await self._wait_for_enter("\n↩️  按下【Enter】鍵中斷導航或結束鎖定...")
         finally:
@@ -114,8 +114,10 @@ class CLISpoofer:
         if input("請選擇 (預設為 2): ").strip() == "1":
             self.preview_route((start_lat, start_lng), (end_lat, end_lng))
         else:
+            print("\n🛣️ 是否使用真實道路路徑？\n1. 使用真實道路 (預設)\n2. 直線移動 (不使用真實道路)")
+            use_real = input("請選擇 (預設為 1): ").strip() != "2"
             save_last_navigation([start_lat, start_lng], [end_lat, end_lng], speed)
-            await self.walk((start_lat, start_lng), (end_lat, end_lng), speed_kmh=speed)
+            await self.walk((start_lat, start_lng), (end_lat, end_lng), speed_kmh=speed, use_real_route=use_real)
 
 def save_last_navigation(start_coords, end_coords, speed):
     """儲存最後一次導航資訊到 config.json"""
@@ -201,7 +203,9 @@ async def main():
                 if input("請選擇 (預設為 2): ").strip() == "1":
                     spoofer.preview_route(start_coords, end_coords)
                 else:
-                    await spoofer.walk(start_coords, end_coords, speed_kmh=default_speed)
+                    print("\n🛣️ 是否使用真實道路路徑？\n1. 使用真實道路 (預設)\n2. 直線移動 (不使用真實道路)")
+                    use_real = input("請選擇 (預設為 1): ").strip() != "2"
+                    await spoofer.walk(start_coords, end_coords, speed_kmh=default_speed, use_real_route=use_real)
             elif choice == "2":
                 await spoofer.manual_input_teleport()
             elif choice == "3":
@@ -221,7 +225,9 @@ async def main():
                 e = last_nav["end_coords"]
                 sp = last_nav["speed"]
                 print(f"\n🔄 使用上次導航：({s[0]}, {s[1]}) -> ({e[0]}, {e[1]})，時速 {sp} km/h")
-                await spoofer.walk(tuple(s), tuple(e), speed_kmh=sp)
+                print("\n🛣️ 是否使用真實道路路徑？\n1. 使用真實道路 (預設)\n2. 直線移動 (不使用真實道路)")
+                use_real = input("請選擇 (預設為 1): ").strip() != "2"
+                await spoofer.walk(tuple(s), tuple(e), speed_kmh=sp, use_real_route=use_real)
             elif choice == "q":
                 break
         except KeyboardInterrupt:
