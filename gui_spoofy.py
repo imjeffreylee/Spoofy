@@ -162,8 +162,17 @@ class App(ctk.CTk):
         )
         self.speed_slider.set(self.default_speed)
         self.speed_slider.grid(
-            row=3, column=1, columnspan=3, padx=5, pady=0, sticky="ew"
+            row=3, column=1, columnspan=2, padx=5, pady=0, sticky="ew"
         )
+
+        self.use_real_route_var = ctk.BooleanVar(value=True)
+        self.use_real_route_cb = ctk.CTkCheckBox(
+            self.control_frame,
+            text="使用真實道路",
+            variable=self.use_real_route_var,
+            width=100
+        )
+        self.use_real_route_cb.grid(row=3, column=3, columnspan=2, padx=5, pady=0)
 
         # 3. 常用地點
         ctk.CTkLabel(self.control_frame, text="📍 常用地點:").grid(
@@ -320,10 +329,12 @@ class App(ctk.CTk):
     def go_walk_home_comp(self):
         if self.core:
             speed = self.speed_slider.get()
+            use_real = self.use_real_route_var.get()
             start_name = self.start_data["name"] if isinstance(self.start_data, dict) else "起點"
             end_name = self.end_data["name"] if isinstance(self.end_data, dict) else "終點"
-            self.log(f"🚶 準備從 {start_name} 行走至 {end_name} (時速 {int(speed)} km/h)...")
-            self.run_action(self.core.walk(self.start_coords, self.end_coords, speed_kmh=speed))
+            mode_str = "真實道路" if use_real else "直線移動"
+            self.log(f"🚶 準備從 {start_name} {mode_str}至 {end_name} (時速 {int(speed)} km/h)...")
+            self.run_action(self.core.walk(self.start_coords, self.end_coords, speed_kmh=speed, use_real_route=use_real))
 
     def _preview_route(self, start_coords, end_coords):
         start_lat, start_lng = start_coords
@@ -366,14 +377,15 @@ class App(ctk.CTk):
     def start_walk(self):
         raw = self.coord_entry.get()
         coords = re.findall(r"[-+]?\d*\.\d+|\d+", raw)
+        use_real = self.use_real_route_var.get()
         if len(coords) >= 4:
             start = (float(coords[0]), float(coords[1]))
             dest = (float(coords[2]), float(coords[3]))
             self.log(f"🚶 偵測到起點與終點，將從 {start} 開始導航...")
-            self.run_action(self.core.walk(start, dest, speed_kmh=self.speed_slider.get()))
+            self.run_action(self.core.walk(start, dest, speed_kmh=self.speed_slider.get(), use_real_route=use_real))
         elif len(coords) >= 2:
             dest = (float(coords[0]), float(coords[1]))
-            self.run_action(self.core.walk(self.core.current_coords, dest, speed_kmh=self.speed_slider.get()))
+            self.run_action(self.core.walk(self.core.current_coords, dest, speed_kmh=self.speed_slider.get(), use_real_route=use_real))
         else:
             self.log("❌ 請先在輸入框貼上「終點」座標。")
 

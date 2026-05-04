@@ -90,13 +90,17 @@ class SpooferCore:
             self.log_callback(f"❌ 定位失敗: {e}")
             raise
 
-    async def walk(self, start_coords, end_coords, speed_kmh=5.0):
+    async def walk(self, start_coords, end_coords, speed_kmh=5.0, use_real_route=True):
         """Simulates walking along a route."""
-        self.log_callback("🔍 正在規劃真實道路路徑...")
         try:
-            path = await self.get_route(start_coords, end_coords)
-            if not path:
-                self.log_callback("⚠️ 無法取得導航路徑，將改為直線移動。")
+            if use_real_route:
+                self.log_callback("🔍 正在規劃真實道路路徑...")
+                path = await self.get_route(start_coords, end_coords)
+                if not path:
+                    self.log_callback("⚠️ 無法取得導航路徑，將改為直線移動。")
+                    path = [start_coords, end_coords]
+            else:
+                self.log_callback("🏃 使用直線移動模式。")
                 path = [start_coords, end_coords]
 
             async with LocationService(self.provider, self.is_ios17) as loc:
