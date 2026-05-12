@@ -113,6 +113,54 @@ python3 spoofy.py
 2. **保持該視窗開啟不要關閉**（它會負責建立與手機的加密連線）。
 3. 回到原本的視窗執行 `python3 gui_spoofy.py` 或 `python3 spoofy.py`。
 
+### 📶 無線連接 (WiFi) 使用方式
+
+若你不想使用傳輸線，可以透過 WiFi 無線連接 iPhone。設定步驟如下：
+
+#### 前置條件
+
+- iPhone 和 Mac 必須在**同一個 WiFi 網路**下。
+- iPhone 需開啟「**開發者模式**」（設定 → 隱私權與安全性 → 開發者模式）。
+
+#### 首次設定（需插 USB 線，僅需一次）
+
+1. 用 USB 線將 iPhone 連接至 Mac，解鎖 iPhone。
+2. 執行配對指令：
+   ```bash
+   sudo python3 -m pymobiledevice3 lockdown pair
+   ```
+3. 在 iPhone 上點選「**信任此電腦**」。
+4. 配對成功後即可拔除 USB 線。
+
+#### 無線啟動步驟
+
+1. 確認 iPhone 與 Mac 在同一 WiFi 下，並**解鎖 iPhone 螢幕**。
+2. 開啟一個終端機視窗，啟動 tunnel：
+   ```bash
+   sudo python3 -m pymobiledevice3 remote tunneld
+   ```
+3. 確認 tunnel 建立成功（會顯示 `Created tunnel` 字樣）。
+4. 在另一個終端機視窗正常執行程式：
+   ```bash
+   python3 gui_spoofy.py
+   ```
+
+#### 驗證無線連線狀態
+
+可用以下指令確認 iPhone 是否出現在網路裝置中：
+
+```bash
+python3 -m pymobiledevice3 usbmux list
+```
+
+若輸出中包含 `"ConnectionType": "Network"` 的項目，代表 WiFi 連線正常。
+
+#### 常見問題
+
+- **找不到裝置**：確認 iPhone 螢幕已解鎖、兩者在同一 WiFi、路由器未開啟 AP 隔離。
+- **tunnel 建立失敗**：先插 USB 確認 `lockdown pair` 已完成，再重新嘗試。
+- **連線不穩定**：WiFi 連線可能比 USB 稍有延遲，如需高穩定性建議仍使用 USB。
+
 ---
 
 ## 🌟 功能簡介
