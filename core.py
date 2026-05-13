@@ -13,8 +13,10 @@ from pymobiledevice3.services.dvt.instruments.location_simulation import (
 from pymobiledevice3.services.dvt.instruments.dvt_provider import DvtProvider
 from pymobiledevice3.tunneld.api import get_tunneld_devices, TUNNELD_DEFAULT_ADDRESS
 
+
 class LocationService:
     """Abstracts the differences between iOS 17+ and older versions."""
+
     def __init__(self, provider, is_ios17):
         self.provider = provider
         self.is_ios17 = is_ios17
@@ -34,7 +36,8 @@ class LocationService:
             await self._loc.__aexit__(exc_type, exc_val, exc_tb)
             await self._dvt.__aexit__(exc_type, exc_val, exc_tb)
 
-async def get_device_provider():
+
+async def get_device_provider(max_retries=5, retry_delay=3):
     """Gets the appropriate device provider based on iOS version."""
     lockdown = await create_using_usbmux()
     res = lockdown.get_value(None, "ProductVersion")
@@ -42,11 +45,18 @@ async def get_device_provider():
     is_ios17 = int(product_version.split(".")[0]) >= 17
 
     if is_ios17:
-        rsds = await get_tunneld_devices(TUNNELD_DEFAULT_ADDRESS)
-        if not rsds:
-            raise RuntimeError("找不到 Tunnel 裝置，請先執行：sudo python3 -m pymobiledevice3 remote tunneld")
-        return rsds[0], True
+        for attempt in range(max_retries):
+            rsds = await get_tunneld_devices(TUNNELD_DEFAULT_ADDRESS)
+            if rsds:
+                return rsds[0], True
+            if attempt < max_retries - 1:
+                print(f"⏳ 等待 Tunnel 連線中... ({attempt + 1}/{max_retries})")
+                await asyncio.sleep(retry_delay)
+        raise RuntimeError(
+            "找不到 Tunnel 裝置，請先執行：sudo python3 -m pymobiledevice3 remote tunneld"
+        )
     return lockdown, False
+
 
 class SpooferCore:
     def __init__(self, provider, is_ios17, log_callback=None, progress_callback=None):
@@ -70,7 +80,7 @@ class SpooferCore:
         if data.get("code") == "Ok" and data.get("routes"):
             coords = data["routes"][0]["geometry"]["coordinates"]
             return [(lat, lng) for lng, lat in coords]
-        
+
         self.log_callback(f"❌ 無法取得導航路徑：{data.get('message', '未知錯誤')}")
         return None
 
@@ -106,7 +116,7 @@ class SpooferCore:
             async with LocationService(self.provider, self.is_ios17) as loc:
                 await self._do_walk(loc, path, speed_kmh)
                 self.log_callback("🏁 抵達目的地！定位鎖定中...")
-                await asyncio.sleep(86400) # Lock at destination
+                await asyncio.sleep(86400)  # Lock at destination
         except asyncio.CancelledError:
             self.log_callback("🛑 導航已中斷！")
         except Exception as e:
@@ -123,7 +133,9 @@ class SpooferCore:
 
         total_time = total_dist / speed_ms
         finish_time = datetime.now() + timedelta(seconds=total_time)
-        self.log_callback(f"🚶 開始導航！路徑距離: {total_dist:.2f} 公尺, 預計結束時間：{finish_time.strftime('%H:%M:%S')}")
+        self.log_callback(
+            f"🚶 開始導航！路徑距離: {total_dist:.2f} 公尺, 預計結束時間：{finish_time.strftime('%H:%M:%S')}"
+        )
 
         current_dist = 0
         start_time = asyncio.get_event_loop().time()
@@ -138,14 +150,16 @@ class SpooferCore:
             acc_dist = 0
             for i, seg_dist in enumerate(segments):
                 if acc_dist + seg_dist >= current_dist:
-                    ratio = (current_dist - acc_dist) / seg_dist if seg_dist > 0 else 1.0
+                    ratio = (
+                        (current_dist - acc_dist) / seg_dist if seg_dist > 0 else 1.0
+                    )
                     p1, p2 = path[i], path[i + 1]
                     cur_lat = p1[0] + (p2[0] - p1[0]) * ratio
                     cur_lng = p1[1] + (p2[1] - p1[1]) * ratio
-                    
+
                     await loc_service.set(cur_lat, cur_lng)
                     self.current_coords = (cur_lat, cur_lng)
-                    
+
                     progress_pct = (current_dist / total_dist) * 100
                     self.progress_callback(progress_pct, cur_lat, cur_lng)
                     break

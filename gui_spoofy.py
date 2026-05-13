@@ -12,6 +12,7 @@ import customtkinter as ctk
 from core import SpooferCore, get_device_provider
 from spoofy import load_config
 
+
 class App(ctk.CTk):
     def __init__(self):
         super().__init__()
@@ -27,7 +28,7 @@ class App(ctk.CTk):
         self.current_task = None
         self.log_queue = queue.Queue()
         self.last_log_pct = -1
-        
+
         # UI 佈局
         self.grid_columnconfigure(0, weight=1)
         self.grid_rowconfigure(2, weight=1)
@@ -69,7 +70,9 @@ class App(ctk.CTk):
         self.control_frame.grid(row=1, column=0, padx=20, pady=10, sticky="nsew")
         self.control_frame.grid_columnconfigure((0, 1, 2, 3, 4), weight=1)
 
-        start_name = self.start_data["name"] if isinstance(self.start_data, dict) else "起點"
+        start_name = (
+            self.start_data["name"] if isinstance(self.start_data, dict) else "起點"
+        )
         end_name = self.end_data["name"] if isinstance(self.end_data, dict) else "終點"
 
         self.walk_home_comp_btn = ctk.CTkButton(
@@ -170,7 +173,7 @@ class App(ctk.CTk):
             self.control_frame,
             text="使用真實道路",
             variable=self.use_real_route_var,
-            width=100
+            width=100,
         )
         self.use_real_route_cb.grid(row=3, column=3, columnspan=2, padx=5, pady=0)
 
@@ -212,6 +215,7 @@ class App(ctk.CTk):
 
     def bind_macos_shortcuts(self):
         import tkinter as tk
+
         try:
             menubar = tk.Menu(self)
             edit_menu = tk.Menu(menubar, tearoff=0)
@@ -224,15 +228,29 @@ class App(ctk.CTk):
         except Exception as e:
             self.log(f"系統選單建立失敗: {e}")
 
-        def handle_cut(event): event.widget.event_generate("<<Cut>>"); return "break"
-        def handle_copy(event): event.widget.event_generate("<<Copy>>"); return "break"
-        def handle_paste(event): event.widget.event_generate("<<Paste>>"); return "break"
-        def handle_select_all(event): event.widget.event_generate("<<SelectAll>>"); return "break"
+        def handle_cut(event):
+            event.widget.event_generate("<<Cut>>")
+            return "break"
+
+        def handle_copy(event):
+            event.widget.event_generate("<<Copy>>")
+            return "break"
+
+        def handle_paste(event):
+            event.widget.event_generate("<<Paste>>")
+            return "break"
+
+        def handle_select_all(event):
+            event.widget.event_generate("<<SelectAll>>")
+            return "break"
+
         def handle_cmd_backspace(event):
             try:
-                if hasattr(event.widget, "delete"): event.widget.delete(0, "end")
+                if hasattr(event.widget, "delete"):
+                    event.widget.delete(0, "end")
                 return "break"
-            except: pass
+            except:
+                pass
 
         for entry in [self.coord_entry]:
             for prefix in ["<Command-", "<Meta-"]:
@@ -244,26 +262,33 @@ class App(ctk.CTk):
 
         def show_menu(event):
             m = tk.Menu(self, tearoff=0)
-            m.add_command(label="貼上", command=lambda: event.widget.event_generate("<<Paste>>"))
+            m.add_command(
+                label="貼上", command=lambda: event.widget.event_generate("<<Paste>>")
+            )
             m.tk_popup(event.x_root, event.y_root)
 
-        self.coord_entry.bind("<Button-2>" if os.name == "posix" else "<Button-3>", show_menu)
+        self.coord_entry.bind(
+            "<Button-2>" if os.name == "posix" else "<Button-3>", show_menu
+        )
 
     def start_async_loop(self):
         def run_loop():
             self.loop = asyncio.new_event_loop()
             asyncio.set_event_loop(self.loop)
             self.loop.run_forever()
+
         threading.Thread(target=run_loop, daemon=True).start()
 
     def run_action(self, coro):
         if self.current_task:
             self.loop.call_soon_threadsafe(self.current_task.cancel)
+
         async def wrapped():
             try:
                 await coro
             except asyncio.CancelledError:
                 pass
+
         self.current_task = asyncio.run_coroutine_threadsafe(wrapped(), self.loop)
 
     def log(self, message):
@@ -284,7 +309,9 @@ class App(ctk.CTk):
 
         if self.core and self.core.current_coords:
             lat, lng = self.core.current_coords
-            self.current_coord_label.configure(text=f"📍 當前模擬位置: {lat:.6f}, {lng:.6f}")
+            self.current_coord_label.configure(
+                text=f"📍 當前模擬位置: {lat:.6f}, {lng:.6f}"
+            )
         self.after(100, self.check_logs)
 
     def start_connection(self):
@@ -295,24 +322,35 @@ class App(ctk.CTk):
             try:
                 provider, is_ios17 = await get_device_provider()
                 self.core = SpooferCore(
-                    provider, 
-                    is_ios17, 
+                    provider,
+                    is_ios17,
                     log_callback=self.log,
-                    progress_callback=self.log_progress
+                    progress_callback=self.log_progress,
                 )
-                self.core.current_coords = self.start_coords # Set initial
+                self.core.current_coords = self.start_coords  # Set initial
                 self.after(0, self.on_connected)
                 self.log(f"✅ 連線成功 (iOS 17+: {is_ios17})")
             except Exception as e:
                 self.log(f"❌ 連線失敗: {e}")
-                self.after(0, lambda: self.connect_btn.configure(state="normal", text="開始連線"))
+                self.after(
+                    0,
+                    lambda: self.connect_btn.configure(state="normal", text="開始連線"),
+                )
 
         asyncio.run_coroutine_threadsafe(connect(), self.loop)
 
     def on_connected(self):
         self.status_label.configure(text="🟢 已連線", text_color="green")
         self.connect_btn.configure(text="重新連線", state="normal")
-        for btn in [self.walk_home_comp_btn, self.preview_home_comp_btn, self.teleport_btn, self.set_start_btn, self.walk_btn, self.preview_custom_walk_btn, self.stop_btn]:
+        for btn in [
+            self.walk_home_comp_btn,
+            self.preview_home_comp_btn,
+            self.teleport_btn,
+            self.set_start_btn,
+            self.walk_btn,
+            self.preview_custom_walk_btn,
+            self.stop_btn,
+        ]:
             btn.configure(state="normal")
         if self.frequent_locations:
             self.freq_go_btn.configure(state="normal")
@@ -330,11 +368,24 @@ class App(ctk.CTk):
         if self.core:
             speed = self.speed_slider.get()
             use_real = self.use_real_route_var.get()
-            start_name = self.start_data["name"] if isinstance(self.start_data, dict) else "起點"
-            end_name = self.end_data["name"] if isinstance(self.end_data, dict) else "終點"
+            start_name = (
+                self.start_data["name"] if isinstance(self.start_data, dict) else "起點"
+            )
+            end_name = (
+                self.end_data["name"] if isinstance(self.end_data, dict) else "終點"
+            )
             mode_str = "真實道路" if use_real else "直線移動"
-            self.log(f"🚶 準備從 {start_name} {mode_str}至 {end_name} (時速 {int(speed)} km/h)...")
-            self.run_action(self.core.walk(self.start_coords, self.end_coords, speed_kmh=speed, use_real_route=use_real))
+            self.log(
+                f"🚶 準備從 {start_name} {mode_str}至 {end_name} (時速 {int(speed)} km/h)..."
+            )
+            self.run_action(
+                self.core.walk(
+                    self.start_coords,
+                    self.end_coords,
+                    speed_kmh=speed,
+                    use_real_route=use_real,
+                )
+            )
 
     def _preview_route(self, start_coords, end_coords):
         start_lat, start_lng = start_coords
@@ -348,15 +399,20 @@ class App(ctk.CTk):
             self._preview_route(self.start_coords, self.end_coords)
 
     def go_frequent(self):
-        if not self.core or not self.frequent_locations: return
+        if not self.core or not self.frequent_locations:
+            return
         selected_name = self.freq_menu.get()
-        target = next((loc for loc in self.frequent_locations if loc["name"] == selected_name), None)
+        target = next(
+            (loc for loc in self.frequent_locations if loc["name"] == selected_name),
+            None,
+        )
         if target:
             self.log(f"📍 準備前往常用地點: {target['name']}...")
             self.run_action(self.core.teleport(*target["coords"]))
 
     def set_as_start(self):
-        if not self.core: return
+        if not self.core:
+            return
         raw = self.coord_entry.get()
         coords = re.findall(r"[-+]?\d*\.\d+|\d+", raw)
         if len(coords) >= 2:
@@ -382,15 +438,30 @@ class App(ctk.CTk):
             start = (float(coords[0]), float(coords[1]))
             dest = (float(coords[2]), float(coords[3]))
             self.log(f"🚶 偵測到起點與終點，將從 {start} 開始導航...")
-            self.run_action(self.core.walk(start, dest, speed_kmh=self.speed_slider.get(), use_real_route=use_real))
+            self.run_action(
+                self.core.walk(
+                    start,
+                    dest,
+                    speed_kmh=self.speed_slider.get(),
+                    use_real_route=use_real,
+                )
+            )
         elif len(coords) >= 2:
             dest = (float(coords[0]), float(coords[1]))
-            self.run_action(self.core.walk(self.core.current_coords, dest, speed_kmh=self.speed_slider.get(), use_real_route=use_real))
+            self.run_action(
+                self.core.walk(
+                    self.core.current_coords,
+                    dest,
+                    speed_kmh=self.speed_slider.get(),
+                    use_real_route=use_real,
+                )
+            )
         else:
             self.log("❌ 請先在輸入框貼上「終點」座標。")
 
     def preview_custom_walk(self):
-        if not self.core: return
+        if not self.core:
+            return
         raw = self.coord_entry.get()
         coords = re.findall(r"[-+]?\d*\.\d+|\d+", raw)
         if len(coords) >= 2:
@@ -398,6 +469,7 @@ class App(ctk.CTk):
             self._preview_route(self.core.current_coords, dest)
         else:
             self.log("❌ 請先在輸入框貼上「終點」座標以進行預覽。")
+
 
 if __name__ == "__main__":
     App().mainloop()
