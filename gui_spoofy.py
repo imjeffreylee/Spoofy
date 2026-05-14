@@ -41,6 +41,7 @@ class App(ctk.CTk):
             self.frequent_locations,
             self.start_data,
             self.end_data,
+            self.last_navigation,
         ) = load_config()
 
         self.setup_ui()
