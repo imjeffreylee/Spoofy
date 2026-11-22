@@ -16,11 +16,7 @@ private struct SimulationView: View {
         case movement = "模擬移動"
     }
 
-    private enum RouteType: String, CaseIterable {
-        case walking = "步行道路"
-        case direct = "直線"
-    }
-
+    @AppStorage("lastMovement") private var lastMovementData: Data?
     @State private var simulation = LocationSimulation()
     @State private var hasPairing = LocationSimulation.hasSavedPairing
     @State private var importingPairing = false
@@ -28,7 +24,7 @@ private struct SimulationView: View {
     @State private var coordinateText = ""
     @State private var startText = ""
     @State private var endText = ""
-    @State private var routeType = RouteType.walking
+    @State private var routeType = MovementSettings.RouteType.walking
     @State private var speedKPH: Double = 19
     @State private var movementTask: Task<Void, Never>?
     @State private var movementProgress: Double?
@@ -64,6 +60,20 @@ private struct SimulationView: View {
                     }
                     .pickerStyle(.segmented)
                     .disabled(busy)
+                }
+
+                if let lastMovement = MovementSettings.restore(from: lastMovementData) {
+                    Section {
+                        Button("開始上次路線", systemImage: "arrow.counterclockwise") {
+                            startText = "\(lastMovement.start.latitude), \(lastMovement.start.longitude)"
+                            endText = "\(lastMovement.end.latitude), \(lastMovement.end.longitude)"
+                            routeType = lastMovement.routeType
+                            speedKPH = lastMovement.speedKPH
+                            mode = .movement
+                            startMovement(lastMovement)
+                        }
+                        .disabled(!hasPairing || busy)
+                    }
                 }
 
                 switch mode {
@@ -148,8 +158,8 @@ private struct SimulationView: View {
             coordinateField("起點緯度, 經度", text: $startText)
             coordinateField("終點緯度, 經度", text: $endText)
             Picker("路線", selection: $routeType) {
-                ForEach(RouteType.allCases, id: \.self) { option in
-                    Text(option.rawValue).tag(option)
+                ForEach(MovementSettings.RouteType.allCases, id: \.self) { option in
+                    Text(option.title).tag(option)
                 }
             }
             VStack(alignment: .leading, spacing: 4) {
@@ -164,7 +174,7 @@ private struct SimulationView: View {
             }
             Button("開始移動", systemImage: "point.bottomleft.forward.to.point.topright.scurvepath") {
                 guard let startCoordinates, let endCoordinates else { return }
-                startMovement(from: startCoordinates, to: endCoordinates)
+                startMovement(MovementSettings(start: startCoordinates, end: endCoordinates, routeType: routeType, speedKPH: speedKPH))
             }
             .disabled(!hasPairing || startCoordinates == nil || endCoordinates == nil || startCoordinates == endCoordinates)
         } footer: {
@@ -187,10 +197,8 @@ private struct SimulationView: View {
             .accessibilityLabel(title)
     }
 
-    private func startMovement(from start: Coordinates, to end: Coordinates) {
-        guard !busy else { return }
-        let routeType = routeType
-        let speedKPH = speedKPH
+    private func startMovement(_ settings: MovementSettings) {
+        guard hasPairing, !busy, settings.isValid else { return }
         movementTask = Task {
             let locationSession = MovementLocationSession {
                 observedSimulatedLocation = $0
@@ -203,14 +211,17 @@ private struct SimulationView: View {
             }
             do {
                 try await locationSession.start()
-                let route = switch routeType {
-                case .walking: try await MovementRoute.walking(from: start, to: end)
-                case .direct: try MovementRoute(points: [start, end])
+                let route = switch settings.routeType {
+                case .walking: try await MovementRoute.walking(from: settings.start, to: settings.end)
+                case .direct: try MovementRoute(points: [settings.start, settings.end])
                 }
                 try Task.checkCancellation()
-                try await route.play(speedKPH: speedKPH) { coordinates, progress in
+                try await route.play(speedKPH: settings.speedKPH) { coordinates, progress in
                     try locationSession.requireAuthorization()
                     try await simulation.setLocation(coordinates)
+                    if progress == 0, let data = try? JSONEncoder().encode(settings) {
+                        lastMovementData = data
+                    }
                     try Task.checkCancellation()
                     movementProgress = progress
                 }

@@ -2,6 +2,35 @@ import CoreLocation
 import Foundation
 import MapKit
 
+struct MovementSettings: Codable, Equatable {
+    enum RouteType: String, CaseIterable, Codable {
+        case walking, direct
+
+        var title: String {
+            switch self {
+            case .walking: "步行道路"
+            case .direct: "直線"
+            }
+        }
+    }
+
+    let start: Coordinates
+    let end: Coordinates
+    let routeType: RouteType
+    let speedKPH: Double
+
+    var isValid: Bool {
+        start.isValid && end.isValid && start != end && MovementRoute.speedRange.contains(speedKPH)
+    }
+
+    static func restore(from data: Data?) -> Self? {
+        guard let data, let settings = try? JSONDecoder().decode(Self.self, from: data), settings.isValid else {
+            return nil
+        }
+        return settings
+    }
+}
+
 struct MovementRoute {
     static let speedRange = 1.0...20.0
 

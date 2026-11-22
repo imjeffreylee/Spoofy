@@ -1,12 +1,16 @@
 import Foundation
 
-struct Coordinates: Equatable, Sendable {
+struct Coordinates: Codable, Equatable, Sendable {
     let latitude: Double
     let longitude: Double
 
     init(latitude: Double, longitude: Double) {
         self.latitude = latitude
         self.longitude = longitude
+    }
+
+    var isValid: Bool {
+        (-90.0...90.0).contains(latitude) && (-180.0...180.0).contains(longitude)
     }
 
     init?(text: String) {
@@ -21,12 +25,10 @@ struct Coordinates: Equatable, Sendable {
             .split(separator: ",", omittingEmptySubsequences: false)
         guard values.count == 2,
               let latitude = Double(values[0].trimmingCharacters(in: .whitespacesAndNewlines)),
-              let longitude = Double(values[1].trimmingCharacters(in: .whitespacesAndNewlines)),
-              (-90.0...90.0).contains(latitude),
-              (-180.0...180.0).contains(longitude) else {
+              let longitude = Double(values[1].trimmingCharacters(in: .whitespacesAndNewlines)) else {
             return nil
         }
-        self.latitude = latitude
-        self.longitude = longitude
+        self.init(latitude: latitude, longitude: longitude)
+        guard isValid else { return nil }
     }
 }
