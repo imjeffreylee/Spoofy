@@ -4,8 +4,20 @@ struct Coordinates: Equatable, Sendable {
     let latitude: Double
     let longitude: Double
 
+    init(latitude: Double, longitude: Double) {
+        self.latitude = latitude
+        self.longitude = longitude
+    }
+
     init?(text: String) {
-        let values = text.replacingOccurrences(of: "，", with: ",")
+        var coordinateText = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        if (coordinateText.hasPrefix("(") && coordinateText.hasSuffix(")")) ||
+            (coordinateText.hasPrefix("（") && coordinateText.hasSuffix("）")) {
+            coordinateText.removeFirst()
+            coordinateText.removeLast()
+        }
+
+        let values = coordinateText.replacingOccurrences(of: "，", with: ",")
             .split(separator: ",", omittingEmptySubsequences: false)
         guard values.count == 2,
               let latitude = Double(values[0].trimmingCharacters(in: .whitespacesAndNewlines)),

@@ -1,111 +1,163 @@
 // !$*UTF8*$!
 {
 	archiveVersion = 1;
-	classes = {};
+	classes = {
+	};
 	objectVersion = 56;
 	objects = {
-		A10000000000000000000001 = {isa = PBXBuildFile; fileRef = A10000000000000000000011; };
-		A10000000000000000000002 = {isa = PBXBuildFile; fileRef = A10000000000000000000012; };
-		A10000000000000000000003 = {isa = PBXBuildFile; fileRef = A10000000000000000000013; };
-		A10000000000000000000004 = {isa = PBXBuildFile; fileRef = A10000000000000000000014; };
 
-		A10000000000000000000011 = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SpoofyApp.swift; sourceTree = "<group>"; };
-		A10000000000000000000012 = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Coordinates.swift; sourceTree = "<group>"; };
-		A10000000000000000000013 = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LocationSimulation.swift; sourceTree = "<group>"; };
-		A10000000000000000000014 = {isa = PBXFileReference; lastKnownFileType = wrapper.xcframework; name = IDevice.xcframework; path = Vendor/IDevice.xcframework; sourceTree = "<group>"; };
-		A10000000000000000000015 = {isa = PBXFileReference; explicitFileType = wrapper.application; path = Spoofy.app; sourceTree = BUILT_PRODUCTS_DIR; };
-		A10000000000000000000016 = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
+/* Begin PBXBuildFile section */
+		A10000000000000000000001 /* SpoofyApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000011 /* SpoofyApp.swift */; };
+		A10000000000000000000002 /* Coordinates.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000012 /* Coordinates.swift */; };
+		A10000000000000000000003 /* LocationSimulation.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000013 /* LocationSimulation.swift */; };
+		A10000000000000000000004 /* IDevice.xcframework in Frameworks */ = {isa = PBXBuildFile; fileRef = A10000000000000000000014 /* IDevice.xcframework */; };
+		A10000000000000000000005 /* MovementRoute.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000017 /* MovementRoute.swift */; };
+/* End PBXBuildFile section */
 
+/* Begin PBXFileReference section */
+		A10000000000000000000011 /* SpoofyApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SpoofyApp.swift; sourceTree = "<group>"; };
+		A10000000000000000000012 /* Coordinates.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Coordinates.swift; sourceTree = "<group>"; };
+		A10000000000000000000013 /* LocationSimulation.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LocationSimulation.swift; sourceTree = "<group>"; };
+		A10000000000000000000014 /* IDevice.xcframework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.xcframework; name = IDevice.xcframework; path = Vendor/IDevice.xcframework; sourceTree = "<group>"; };
+		A10000000000000000000015 /* Spoofy.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; path = Spoofy.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		A10000000000000000000016 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
+		A10000000000000000000017 /* MovementRoute.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MovementRoute.swift; sourceTree = "<group>"; };
+/* End PBXFileReference section */
+
+/* Begin PBXFrameworksBuildPhase section */
+		A10000000000000000000031 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				A10000000000000000000004 /* IDevice.xcframework in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXFrameworksBuildPhase section */
+
+/* Begin PBXGroup section */
 		A10000000000000000000020 = {
 			isa = PBXGroup;
-			children = (A10000000000000000000021, A10000000000000000000014, A10000000000000000000022);
+			children = (
+				A10000000000000000000021 /* Spoofy */,
+				A10000000000000000000014 /* IDevice.xcframework */,
+				A10000000000000000000022 /* Products */,
+			);
 			sourceTree = "<group>";
 		};
-		A10000000000000000000021 = {
+		A10000000000000000000021 /* Spoofy */ = {
 			isa = PBXGroup;
-			children = (A10000000000000000000011, A10000000000000000000012, A10000000000000000000013, A10000000000000000000016);
+			children = (
+				A10000000000000000000011 /* SpoofyApp.swift */,
+				A10000000000000000000012 /* Coordinates.swift */,
+				A10000000000000000000013 /* LocationSimulation.swift */,
+				A10000000000000000000017 /* MovementRoute.swift */,
+				A10000000000000000000016 /* Info.plist */,
+			);
 			path = Spoofy;
 			sourceTree = "<group>";
 		};
-		A10000000000000000000022 = {
+		A10000000000000000000022 /* Products */ = {
 			isa = PBXGroup;
-			children = (A10000000000000000000015);
+			children = (
+				A10000000000000000000015 /* Spoofy.app */,
+			);
 			name = Products;
 			sourceTree = "<group>";
 		};
+/* End PBXGroup section */
 
-		A10000000000000000000030 = {
-			isa = PBXSourcesBuildPhase;
-			buildActionMask = 2147483647;
-			files = (A10000000000000000000001, A10000000000000000000002, A10000000000000000000003);
-			runOnlyForDeploymentPostprocessing = 0;
-		};
-		A10000000000000000000031 = {
-			isa = PBXFrameworksBuildPhase;
-			buildActionMask = 2147483647;
-			files = (A10000000000000000000004);
-			runOnlyForDeploymentPostprocessing = 0;
-		};
-
-		A10000000000000000000040 = {
+/* Begin PBXNativeTarget section */
+		A10000000000000000000040 /* Spoofy */ = {
 			isa = PBXNativeTarget;
-			buildConfigurationList = A10000000000000000000061;
-			buildPhases = (A10000000000000000000030, A10000000000000000000031);
-			buildRules = ();
-			dependencies = ();
+			buildConfigurationList = A10000000000000000000061 /* Build configuration list for PBXNativeTarget "Spoofy" */;
+			buildPhases = (
+				A10000000000000000000030 /* Sources */,
+				A10000000000000000000031 /* Frameworks */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
 			name = Spoofy;
 			productName = Spoofy;
-			productReference = A10000000000000000000015;
+			productReference = A10000000000000000000015 /* Spoofy.app */;
 			productType = "com.apple.product-type.application";
 		};
-		A10000000000000000000041 = {
+/* End PBXNativeTarget section */
+
+/* Begin PBXProject section */
+		A10000000000000000000041 /* Project object */ = {
 			isa = PBXProject;
-			attributes = {LastUpgradeCheck = 2720;};
-			buildConfigurationList = A10000000000000000000060;
+			attributes = {
+				LastUpgradeCheck = 2720;
+			};
+			buildConfigurationList = A10000000000000000000060 /* Build configuration list for PBXProject "Spoofy" */;
 			compatibilityVersion = "Xcode 14.0";
 			developmentRegion = "zh-Hant";
-			knownRegions = ("zh-Hant", Base);
+			hasScannedForEncodings = 0;
+			knownRegions = (
+				"zh-Hant",
+				Base,
+			);
 			mainGroup = A10000000000000000000020;
-			productRefGroup = A10000000000000000000022;
+			productRefGroup = A10000000000000000000022 /* Products */;
 			projectDirPath = "";
 			projectRoot = "";
-			targets = (A10000000000000000000040);
+			targets = (
+				A10000000000000000000040 /* Spoofy */,
+			);
 		};
+/* End PBXProject section */
 
-		A10000000000000000000050 = {
+/* Begin PBXSourcesBuildPhase section */
+		A10000000000000000000030 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				A10000000000000000000001 /* SpoofyApp.swift in Sources */,
+				A10000000000000000000002 /* Coordinates.swift in Sources */,
+				A10000000000000000000003 /* LocationSimulation.swift in Sources */,
+				A10000000000000000000005 /* MovementRoute.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXSourcesBuildPhase section */
+
+/* Begin XCBuildConfiguration section */
+		A10000000000000000000050 /* Debug */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
 				DEBUG_INFORMATION_FORMAT = dwarf;
 				IPHONEOS_DEPLOYMENT_TARGET = 17.4;
 				"IPHONEOS_DEPLOYMENT_TARGET[sdk=iphonesimulator*]" = 26.5;
 				SDKROOT = iphoneos;
-				"SWIFT_INCLUDE_PATHS[sdk=iphoneos*]" = "$(SRCROOT)/Vendor/IDevice.xcframework/ios-arm64/Headers";
-				"SWIFT_INCLUDE_PATHS[sdk=iphonesimulator*]" = "$(SRCROOT)/Vendor/IDevice.xcframework/ios-arm64_x86_64-simulator/Headers";
 				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
 			};
 			name = Debug;
 		};
-		A10000000000000000000051 = {
+		A10000000000000000000051 /* Release */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
 				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
 				IPHONEOS_DEPLOYMENT_TARGET = 17.4;
 				"IPHONEOS_DEPLOYMENT_TARGET[sdk=iphonesimulator*]" = 26.5;
 				SDKROOT = iphoneos;
 				SWIFT_COMPILATION_MODE = wholemodule;
-				"SWIFT_INCLUDE_PATHS[sdk=iphoneos*]" = "$(SRCROOT)/Vendor/IDevice.xcframework/ios-arm64/Headers";
-				"SWIFT_INCLUDE_PATHS[sdk=iphonesimulator*]" = "$(SRCROOT)/Vendor/IDevice.xcframework/ios-arm64_x86_64-simulator/Headers";
 				SWIFT_OPTIMIZATION_LEVEL = "-O";
 			};
 			name = Release;
 		};
-		A10000000000000000000052 = {
+		A10000000000000000000052 /* Debug */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 1;
+				CURRENT_PROJECT_VERSION = 2;
+				DEVELOPMENT_TEAM = BRSK9UG338;
 				INFOPLIST_FILE = Spoofy/Info.plist;
-				MARKETING_VERSION = 0.1;
+				MARKETING_VERSION = 0.2;
 				PRODUCT_BUNDLE_IDENTIFIER = app.spoofy.personal;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
@@ -114,13 +166,14 @@
 			};
 			name = Debug;
 		};
-		A10000000000000000000053 = {
+		A10000000000000000000053 /* Release */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 1;
+				CURRENT_PROJECT_VERSION = 2;
+				DEVELOPMENT_TEAM = BRSK9UG338;
 				INFOPLIST_FILE = Spoofy/Info.plist;
-				MARKETING_VERSION = 0.1;
+				MARKETING_VERSION = 0.2;
 				PRODUCT_BUNDLE_IDENTIFIER = app.spoofy.personal;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
@@ -129,18 +182,28 @@
 			};
 			name = Release;
 		};
-		A10000000000000000000060 = {
+/* End XCBuildConfiguration section */
+
+/* Begin XCConfigurationList section */
+		A10000000000000000000060 /* Build configuration list for PBXProject "Spoofy" */ = {
 			isa = XCConfigurationList;
-			buildConfigurations = (A10000000000000000000050, A10000000000000000000051);
+			buildConfigurations = (
+				A10000000000000000000050 /* Debug */,
+				A10000000000000000000051 /* Release */,
+			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;
 		};
-		A10000000000000000000061 = {
+		A10000000000000000000061 /* Build configuration list for PBXNativeTarget "Spoofy" */ = {
 			isa = XCConfigurationList;
-			buildConfigurations = (A10000000000000000000052, A10000000000000000000053);
+			buildConfigurations = (
+				A10000000000000000000052 /* Debug */,
+				A10000000000000000000053 /* Release */,
+			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;
 		};
+/* End XCConfigurationList section */
 	};
-	rootObject = A10000000000000000000041;
+	rootObject = A10000000000000000000041 /* Project object */;
 }
