@@ -12,6 +12,7 @@
 		A10000000000000000000003 /* LocationSimulation.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000013 /* LocationSimulation.swift */; };
 		A10000000000000000000004 /* IDevice.xcframework in Frameworks */ = {isa = PBXBuildFile; fileRef = A10000000000000000000014 /* IDevice.xcframework */; };
 		A10000000000000000000005 /* MovementRoute.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000017 /* MovementRoute.swift */; };
+		A10000000000000000000006 /* MovementLocationSession.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000018 /* MovementLocationSession.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -22,6 +23,7 @@
 		A10000000000000000000015 /* Spoofy.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; path = Spoofy.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		A10000000000000000000016 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
 		A10000000000000000000017 /* MovementRoute.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MovementRoute.swift; sourceTree = "<group>"; };
+		A10000000000000000000018 /* MovementLocationSession.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MovementLocationSession.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -52,6 +54,7 @@
 				A10000000000000000000012 /* Coordinates.swift */,
 				A10000000000000000000013 /* LocationSimulation.swift */,
 				A10000000000000000000017 /* MovementRoute.swift */,
+				A10000000000000000000018 /* MovementLocationSession.swift */,
 				A10000000000000000000016 /* Info.plist */,
 			);
 			path = Spoofy;
@@ -119,6 +122,7 @@
 				A10000000000000000000002 /* Coordinates.swift in Sources */,
 				A10000000000000000000003 /* LocationSimulation.swift in Sources */,
 				A10000000000000000000005 /* MovementRoute.swift in Sources */,
+				A10000000000000000000006 /* MovementLocationSession.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

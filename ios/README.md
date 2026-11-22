@@ -26,6 +26,6 @@
 ## 模擬移動
 
 1. 保持 LocalDevVPN 連線，選「模擬移動」，貼上起點與終點座標。
-2. 選「步行道路」或「直線」，設定 1 至 100 km/h 的速度，再點「開始移動」。步行路線由 Apple 地圖規劃，需要網路連線。
-3. 開啟「切換 App 時繼續移動」後，在 iPhone 同意定位權限即可嘗試背景播放。若關閉此選項或未提供定位權限，切到背景會暫停路線，回到 Spoofy 後繼續。鎖屏和長時間背景播放仍需真機驗證。 [Apple 背景定位說明](https://developer.apple.com/documentation/corelocation/handling-location-updates-in-the-background)
+2. 選「步行道路」或「直線」，設定速度（預設 19 km/h，可調整為 1 至 20 km/h），再點「開始移動」。步行路線由 Apple 地圖規劃，需要網路連線。
+3. 第一次開始移動時，選擇「使用 App 期間允許」定位。播放路線時，切換 App 會繼續移動。若已拒絕定位權限，請到 iPhone 的「設定 → App → Spoofy → 位置」允許後重試。 [Apple 背景定位說明](https://developer.apple.com/documentation/corelocation/handling-location-updates-in-the-background)
 4. 抵達後保留終點位置。可隨時點「停止模擬」，中止路線並恢復實際定位。

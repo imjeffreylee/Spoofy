@@ -3,6 +3,8 @@ import Foundation
 import MapKit
 
 struct MovementRoute {
+    static let speedRange = 1.0...20.0
+
     private struct Waypoint {
         let coordinates: Coordinates
         let distance: Double
@@ -89,10 +91,9 @@ struct MovementRoute {
     @MainActor
     func play(
         speedKPH: Double,
-        canAdvance: () -> Bool,
         update: (Coordinates, Double) async throws -> Void
     ) async throws {
-        guard (1...100).contains(speedKPH) else { throw Failure.invalidSpeed }
+        guard Self.speedRange.contains(speedKPH) else { throw Failure.invalidSpeed }
         try Task.checkCancellation()
         try await update(position(at: 0), 0)
 
@@ -106,7 +107,6 @@ struct MovementRoute {
             let now = clock.now
             let elapsed = lastTick.duration(to: now).components
             lastTick = now
-            guard canAdvance() else { continue }
             let seconds = Double(elapsed.seconds) + Double(elapsed.attoseconds) / 1e18
             // Limit progress on resumption after iOS suspends the app.
             traveled = min(distance, traveled + min(seconds, 1.5) * metersPerSecond)
@@ -122,7 +122,7 @@ struct MovementRoute {
             switch self {
             case .emptyRoute: "起點和終點必須是不同的位置。"
             case .noWalkingRoute: "Apple 地圖找不到步行路線。請確認網路連線，或改用直線。"
-            case .invalidSpeed: "移動速度須介於 1 到 100 公里／小時。"
+            case .invalidSpeed: "移動速度須介於 1 到 20 公里／小時。"
             }
         }
     }

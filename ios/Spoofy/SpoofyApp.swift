@@ -1,4 +1,3 @@
-import CoreLocation
 import SwiftUI
 import UniformTypeIdentifiers
 
@@ -22,7 +21,6 @@ private struct SimulationView: View {
         case direct = "直線"
     }
 
-    @Environment(\.scenePhase) private var scenePhase
     @State private var simulation = LocationSimulation()
     @State private var hasPairing = LocationSimulation.hasSavedPairing
     @State private var importingPairing = false
@@ -31,9 +29,7 @@ private struct SimulationView: View {
     @State private var startText = ""
     @State private var endText = ""
     @State private var routeType = RouteType.walking
-    @State private var speedKPH: Double = 5
-    @State private var backgroundPlayback = true
-    @State private var isInBackground = false
+    @State private var speedKPH: Double = 19
     @State private var movementTask: Task<Void, Never>?
     @State private var movementProgress: Double?
     @State private var observedSimulatedLocation = false
@@ -111,9 +107,6 @@ private struct SimulationView: View {
                 }
             }
             .navigationTitle("Spoofy")
-            .onChange(of: scenePhase, initial: true) { _, phase in
-                isInBackground = phase == .background
-            }
             .fileImporter(isPresented: $importingPairing, allowedContentTypes: [.data]) { result in
                 switch result {
                 case let .success(url):
@@ -165,11 +158,10 @@ private struct SimulationView: View {
                     Spacer()
                     Text("\(Int(speedKPH)) km/h").monospacedDigit()
                 }
-                Slider(value: $speedKPH, in: 1...100, step: 1)
+                Slider(value: $speedKPH, in: MovementRoute.speedRange, step: 1)
                     .accessibilityLabel("移動速度")
                     .accessibilityValue("\(Int(speedKPH)) 公里每小時")
             }
-            Toggle("切換 App 時繼續移動", isOn: $backgroundPlayback)
             Button("開始移動", systemImage: "point.bottomleft.forward.to.point.topright.scurvepath") {
                 guard let startCoordinates, let endCoordinates else { return }
                 startMovement(from: startCoordinates, to: endCoordinates)
@@ -180,10 +172,8 @@ private struct SimulationView: View {
                 Text("請輸入有效的緯度和經度，例如 25.0339, 121.5644。")
             } else if let startCoordinates, startCoordinates == endCoordinates {
                 Text("起點和終點必須是不同的位置。")
-            } else if backgroundPlayback {
-                Text("開始前請連接 LocalDevVPN。允許定位權限後，切換 App 時可以繼續移動。")
             } else {
-                Text("開始前請連接 LocalDevVPN。切換 App 時會暫停移動。")
+                Text("請先連接 LocalDevVPN 並允許定位權限，讓路線能在切換 App 後繼續播放。")
             }
         }
         .disabled(busy)
@@ -201,20 +191,29 @@ private struct SimulationView: View {
         guard !busy else { return }
         let routeType = routeType
         let speedKPH = speedKPH
-        let backgroundPlayback = backgroundPlayback
         movementTask = Task {
+            let locationSession = MovementLocationSession {
+                observedSimulatedLocation = $0
+            }
             defer {
+                locationSession.stop()
                 movementTask = nil
                 movementProgress = nil
                 observedSimulatedLocation = false
             }
             do {
+                try await locationSession.start()
                 let route = switch routeType {
                 case .walking: try await MovementRoute.walking(from: start, to: end)
                 case .direct: try MovementRoute(points: [start, end])
                 }
                 try Task.checkCancellation()
-                try await playMovement(route, speedKPH: speedKPH, backgroundPlayback: backgroundPlayback)
+                try await route.play(speedKPH: speedKPH) { coordinates, progress in
+                    try locationSession.requireAuthorization()
+                    try await simulation.setLocation(coordinates)
+                    try Task.checkCancellation()
+                    movementProgress = progress
+                }
                 try Task.checkCancellation()
                 message = "已抵達終點。點「停止模擬」可恢復實際定位。"
                 failed = false
@@ -224,42 +223,6 @@ private struct SimulationView: View {
             } catch {
                 // The Stop action clears the location after this task exits.
             }
-        }
-    }
-
-    private func playMovement(_ route: MovementRoute, speedKPH: Double, backgroundPlayback: Bool) async throws {
-        let backgroundSession = backgroundPlayback && !isInBackground ? CLBackgroundActivitySession() : nil
-        let manager = backgroundSession == nil ? nil : CLLocationManager()
-        let monitoring: Task<Void, Never>? = if backgroundSession != nil {
-            Task {
-                do {
-                    for try await update in CLLocationUpdate.liveUpdates(.otherNavigation) {
-                        try Task.checkCancellation()
-                        if let location = update.location {
-                            observedSimulatedLocation = location.sourceInformation?.isSimulatedBySoftware == true
-                        }
-                    }
-                } catch where !Task.isCancelled {
-                    observedSimulatedLocation = false
-                } catch {
-                    // A new route may already be starting after this monitor is cancelled.
-                }
-            }
-        } else {
-            nil
-        }
-        defer {
-            monitoring?.cancel()
-            backgroundSession?.invalidate()
-        }
-
-        try await route.play(speedKPH: speedKPH) {
-            !isInBackground || manager?.authorizationStatus == .authorizedWhenInUse ||
-                manager?.authorizationStatus == .authorizedAlways
-        } update: { coordinates, progress in
-            try await simulation.setLocation(coordinates)
-            try Task.checkCancellation()
-            movementProgress = progress
         }
     }
 
