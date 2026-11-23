@@ -14,14 +14,24 @@ private struct SimulationView: View {
     private enum Mode: String, CaseIterable {
         case location = "設定座標"
         case movement = "模擬移動"
+        case savedPlaces = "已存的地點"
+    }
+
+    private struct SavedPlace: Codable, Identifiable {
+        let id: UUID
+        let name: String
+        let coordinates: Coordinates
     }
 
     @AppStorage("lastMovement") private var lastMovementData: Data?
+    @AppStorage("savedPlaces") private var savedPlacesData: Data?
     @State private var simulation = LocationSimulation()
     @State private var hasPairing = LocationSimulation.hasSavedPairing
     @State private var importingPairing = false
     @State private var mode = Mode.location
     @State private var coordinateText = ""
+    @State private var namingPlace = false
+    @State private var placeName = ""
     @State private var startText = ""
     @State private var endText = ""
     @State private var routeType = MovementSettings.RouteType.walking
@@ -37,6 +47,12 @@ private struct SimulationView: View {
     private var startCoordinates: Coordinates? { Coordinates(text: startText) }
     private var endCoordinates: Coordinates? { Coordinates(text: endText) }
     private var busy: Bool { operation != nil || movementTask != nil }
+    private var trimmedPlaceName: String { placeName.trimmingCharacters(in: .whitespacesAndNewlines) }
+
+    private var savedPlaces: [SavedPlace] {
+        guard let savedPlacesData else { return [] }
+        return (try? JSONDecoder().decode([SavedPlace].self, from: savedPlacesData)) ?? []
+    }
 
     var body: some View {
         NavigationStack {
@@ -79,6 +95,8 @@ private struct SimulationView: View {
                         }
                     }
                     movementSection
+                case .savedPlaces:
+                    savedPlacesSection
                 }
 
                 Section {
@@ -117,6 +135,12 @@ private struct SimulationView: View {
                 }
             }
             .navigationTitle("Spoofy")
+            .alert("地點名稱", isPresented: $namingPlace) {
+                TextField("輸入地點名稱", text: $placeName)
+                Button("取消", role: .cancel) {}
+                Button("儲存", action: savePlace)
+                    .disabled(trimmedPlaceName.isEmpty)
+            }
             .fileImporter(isPresented: $importingPairing, allowedContentTypes: [.data]) { result in
                 switch result {
                 case let .success(url):
@@ -138,12 +162,14 @@ private struct SimulationView: View {
             CoordinateField(title: "緯度, 經度", text: $coordinateText)
             Button("設定座標", systemImage: "location.fill") {
                 guard let coordinates else { return }
-                perform("正在設定座標") {
-                    try await simulation.setLocation(coordinates)
-                    return "已送出座標 \(coordinates.latitude), \(coordinates.longitude)。請到 Apple 地圖確認。"
-                }
+                setLocation(coordinates)
             }
             .disabled(!hasPairing || coordinates == nil || busy)
+            Button("儲存地點", systemImage: "bookmark") {
+                placeName = ""
+                namingPlace = true
+            }
+            .disabled(coordinates == nil || busy)
         } footer: {
             if !coordinateText.isEmpty && coordinates == nil {
                 Text("請輸入有效的緯度和經度，例如 25.0339, 121.5644。")
@@ -187,6 +213,46 @@ private struct SimulationView: View {
             }
         }
         .disabled(busy)
+    }
+
+    private var savedPlacesSection: some View {
+        let places = savedPlaces
+        return Section {
+            if places.isEmpty {
+                Text("尚未儲存地點")
+                    .foregroundStyle(.secondary)
+            } else {
+                ForEach(places) { place in
+                    Button(place.name) {
+                        setLocation(place.coordinates)
+                    }
+                    .disabled(!hasPairing || busy)
+                }
+            }
+        }
+    }
+
+    private func savePlace() {
+        let name = trimmedPlaceName
+        guard let coordinates, !name.isEmpty else { return }
+
+        do {
+            let place = SavedPlace(id: UUID(), name: name, coordinates: coordinates)
+            savedPlacesData = try JSONEncoder().encode(savedPlaces + [place])
+            message = "已儲存地點「\(name)」。"
+            failed = false
+        } catch {
+            message = "無法儲存地點。"
+            failed = true
+        }
+    }
+
+    private func setLocation(_ coordinates: Coordinates) {
+        guard hasPairing, coordinates.isValid else { return }
+        perform("正在設定座標") {
+            try await simulation.setLocation(coordinates)
+            return "已送出座標 \(coordinates.latitude), \(coordinates.longitude)。請到 Apple 地圖確認。"
+        }
     }
 
     private func startMovement(_ settings: MovementSettings) {
