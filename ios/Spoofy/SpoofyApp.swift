@@ -62,23 +62,23 @@ private struct SimulationView: View {
                     .disabled(busy)
                 }
 
-                if let lastMovement = MovementSettings.restore(from: lastMovementData) {
-                    Section {
-                        Button("開始上次路線", systemImage: "arrow.counterclockwise") {
-                            startText = "\(lastMovement.start.latitude), \(lastMovement.start.longitude)"
-                            endText = "\(lastMovement.end.latitude), \(lastMovement.end.longitude)"
-                            routeType = lastMovement.routeType
-                            speedKPH = lastMovement.speedKPH
-                            mode = .movement
-                            startMovement(lastMovement)
-                        }
-                        .disabled(!hasPairing || busy)
-                    }
-                }
-
                 switch mode {
-                case .location: locationSection
-                case .movement: movementSection
+                case .location:
+                    locationSection
+                case .movement:
+                    if let lastMovement = MovementSettings.restore(from: lastMovementData) {
+                        Section {
+                            Button("開始上次路線", systemImage: "arrow.counterclockwise") {
+                                startText = "\(lastMovement.start.latitude), \(lastMovement.start.longitude)"
+                                endText = "\(lastMovement.end.latitude), \(lastMovement.end.longitude)"
+                                routeType = lastMovement.routeType
+                                speedKPH = lastMovement.speedKPH
+                                startMovement(lastMovement)
+                            }
+                            .disabled(!hasPairing || busy)
+                        }
+                    }
+                    movementSection
                 }
 
                 Section {
@@ -135,7 +135,7 @@ private struct SimulationView: View {
 
     private var locationSection: some View {
         Section {
-            coordinateField("緯度, 經度", text: $coordinateText)
+            CoordinateField(title: "緯度, 經度", text: $coordinateText)
             Button("設定座標", systemImage: "location.fill") {
                 guard let coordinates else { return }
                 perform("正在設定座標") {
@@ -155,8 +155,8 @@ private struct SimulationView: View {
 
     private var movementSection: some View {
         Section {
-            coordinateField("起點緯度, 經度", text: $startText)
-            coordinateField("終點緯度, 經度", text: $endText)
+            CoordinateField(title: "起點緯度, 經度", text: $startText)
+            CoordinateField(title: "終點緯度, 經度", text: $endText)
             Picker("路線", selection: $routeType) {
                 ForEach(MovementSettings.RouteType.allCases, id: \.self) { option in
                     Text(option.title).tag(option)
@@ -187,14 +187,6 @@ private struct SimulationView: View {
             }
         }
         .disabled(busy)
-    }
-
-    private func coordinateField(_ title: String, text: Binding<String>) -> some View {
-        TextField(title, text: text)
-            .textInputAutocapitalization(.never)
-            .autocorrectionDisabled()
-            .keyboardType(.numbersAndPunctuation)
-            .accessibilityLabel(title)
     }
 
     private func startMovement(_ settings: MovementSettings) {
@@ -256,5 +248,37 @@ private struct SimulationView: View {
                 failed = true
             }
         }
+    }
+}
+
+private struct CoordinateField: View {
+    let title: String
+    @Binding var text: String
+    @FocusState private var isFocused: Bool
+
+    var body: some View {
+        HStack {
+            TextField(title, text: $text)
+                .textInputAutocapitalization(.never)
+                .autocorrectionDisabled()
+                .keyboardType(.numbersAndPunctuation)
+                .focused($isFocused)
+                .accessibilityLabel(title)
+
+            if !text.isEmpty {
+                Button {
+                    text = ""
+                    isFocused = true
+                } label: {
+                    Image(systemName: "xmark.circle.fill")
+                        .foregroundStyle(.secondary)
+                        .frame(width: 44, height: 44)
+                        .contentShape(Rectangle())
+                }
+                .buttonStyle(.borderless)
+                .accessibilityLabel("清除\(title)")
+            }
+        }
+        .frame(minHeight: 44)
     }
 }
