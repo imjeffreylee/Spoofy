@@ -19,9 +19,25 @@ private struct SimulationView: View {
 
     private struct SavedPlace: Codable, Identifiable {
         let id: UUID
-        let name: String
+        var name: String
         let coordinates: Coordinates
     }
+
+    private enum PlaceDialog {
+        case add(Coordinates)
+        case rename(UUID)
+        case delete(UUID)
+
+        var title: String {
+            switch self {
+            case .add: "地點名稱"
+            case .rename: "編輯地點名稱"
+            case .delete: "刪除地點"
+            }
+        }
+    }
+
+    private static let savedPlaceLimit = 20
 
     @AppStorage("lastMovement") private var lastMovementData: Data?
     @AppStorage("savedPlaces") private var savedPlacesData: Data?
@@ -30,7 +46,7 @@ private struct SimulationView: View {
     @State private var importingPairing = false
     @State private var mode = Mode.location
     @State private var coordinateText = ""
-    @State private var namingPlace = false
+    @State private var placeDialog: PlaceDialog?
     @State private var placeName = ""
     @State private var startText = ""
     @State private var endText = ""
@@ -52,6 +68,15 @@ private struct SimulationView: View {
     private var savedPlaces: [SavedPlace] {
         guard let savedPlacesData else { return [] }
         return (try? JSONDecoder().decode([SavedPlace].self, from: savedPlacesData)) ?? []
+    }
+
+    private var isPlaceDialogPresented: Binding<Bool> {
+        Binding(
+            get: { placeDialog != nil },
+            set: { isPresented in
+                if !isPresented { placeDialog = nil }
+            }
+        )
     }
 
     var body: some View {
@@ -135,11 +160,20 @@ private struct SimulationView: View {
                 }
             }
             .navigationTitle("Spoofy")
-            .alert("地點名稱", isPresented: $namingPlace) {
-                TextField("輸入地點名稱", text: $placeName)
-                Button("取消", role: .cancel) {}
-                Button("儲存", action: savePlace)
-                    .disabled(trimmedPlaceName.isEmpty)
+            .alert(placeDialog?.title ?? "", isPresented: isPlaceDialogPresented, presenting: placeDialog) { dialog in
+                switch dialog {
+                case let .add(coordinates):
+                    placeNameActions { addPlace(at: coordinates) }
+                case let .rename(id):
+                    placeNameActions { renamePlace(id) }
+                case let .delete(id):
+                    Button("取消", role: .cancel) {}
+                    Button("刪除", role: .destructive) { deletePlace(id) }
+                }
+            } message: { dialog in
+                if case .delete = dialog {
+                    Text("確定要刪除地點嗎？")
+                }
             }
             .fileImporter(isPresented: $importingPairing, allowedContentTypes: [.data]) { result in
                 switch result {
@@ -158,18 +192,28 @@ private struct SimulationView: View {
     }
 
     private var locationSection: some View {
-        Section {
+        let reachedLimit = savedPlaces.count >= Self.savedPlaceLimit
+        return Section {
             CoordinateField(title: "緯度, 經度", text: $coordinateText)
             Button("設定座標", systemImage: "location.fill") {
                 guard let coordinates else { return }
                 setLocation(coordinates)
             }
             .disabled(!hasPairing || coordinates == nil || busy)
-            Button("儲存地點", systemImage: "bookmark") {
-                placeName = ""
-                namingPlace = true
+            HStack {
+                Button("儲存地點", systemImage: "bookmark") {
+                    guard let coordinates else { return }
+                    placeName = ""
+                    placeDialog = .add(coordinates)
+                }
+                .disabled(coordinates == nil || busy || reachedLimit)
+                if reachedLimit {
+                    Spacer()
+                    Text("已達到上限\(Self.savedPlaceLimit)筆")
+                        .font(.footnote)
+                        .foregroundStyle(.secondary)
+                }
             }
-            .disabled(coordinates == nil || busy)
         } footer: {
             if !coordinateText.isEmpty && coordinates == nil {
                 Text("請輸入有效的緯度和經度，例如 25.0339, 121.5644。")
@@ -226,23 +270,70 @@ private struct SimulationView: View {
                     Button(place.name) {
                         setLocation(place.coordinates)
                     }
-                    .disabled(!hasPairing || busy)
+                    .disabled(!hasPairing)
+                    .swipeActions(allowsFullSwipe: false) {
+                        Button {
+                            placeDialog = .delete(place.id)
+                        } label: {
+                            Label("刪除", systemImage: "trash")
+                        }
+                        .tint(.red)
+
+                        Button {
+                            placeName = place.name
+                            placeDialog = .rename(place.id)
+                        } label: {
+                            Label("編輯", systemImage: "pencil")
+                        }
+                        .tint(.blue)
+                    }
                 }
             }
         }
+        .disabled(busy)
     }
 
-    private func savePlace() {
-        let name = trimmedPlaceName
-        guard let coordinates, !name.isEmpty else { return }
+    @ViewBuilder
+    private func placeNameActions(onSave: @escaping () -> Void) -> some View {
+        TextField("輸入地點名稱", text: $placeName)
+        Button("取消", role: .cancel) {}
+        Button("儲存", action: onSave)
+            .disabled(trimmedPlaceName.isEmpty)
+    }
 
+    private func addPlace(at coordinates: Coordinates) {
+        let places = savedPlaces
+        let name = trimmedPlaceName
+        guard places.count < Self.savedPlaceLimit, !name.isEmpty else { return }
+
+        let place = SavedPlace(id: UUID(), name: name, coordinates: coordinates)
+        updateSavedPlaces(places + [place], successMessage: "已儲存地點「\(name)」。")
+    }
+
+    private func renamePlace(_ id: UUID) {
+        var places = savedPlaces
+        let name = trimmedPlaceName
+        guard !name.isEmpty, let index = places.firstIndex(where: { $0.id == id }) else { return }
+
+        places[index].name = name
+        updateSavedPlaces(places, successMessage: "已更新地點名稱為「\(name)」。")
+    }
+
+    private func deletePlace(_ id: UUID) {
+        var places = savedPlaces
+        guard let index = places.firstIndex(where: { $0.id == id }) else { return }
+
+        let place = places.remove(at: index)
+        updateSavedPlaces(places, successMessage: "已刪除地點「\(place.name)」。")
+    }
+
+    private func updateSavedPlaces(_ places: [SavedPlace], successMessage: String) {
         do {
-            let place = SavedPlace(id: UUID(), name: name, coordinates: coordinates)
-            savedPlacesData = try JSONEncoder().encode(savedPlaces + [place])
-            message = "已儲存地點「\(name)」。"
+            savedPlacesData = try JSONEncoder().encode(places)
+            message = successMessage
             failed = false
         } catch {
-            message = "無法儲存地點。"
+            message = "無法更新已存的地點。"
             failed = true
         }
     }
