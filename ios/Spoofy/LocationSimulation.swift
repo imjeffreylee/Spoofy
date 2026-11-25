@@ -45,32 +45,37 @@ actor LocationSimulation {
     }
 
     func setLocation(_ coordinates: Coordinates) throws {
-        let session = try connectIfNeeded()
-        do {
-            try Self.check(
-                location_simulation_set(session.location, coordinates.latitude, coordinates.longitude),
-                message: "無法設定模擬座標。請確認 LocalDevVPN 後重試。"
-            )
-        } catch {
-            connection = nil
-            throw error
+        try sendCommand(message: "無法設定模擬座標。請確認 LocalDevVPN 後重試。") { location in
+            location_simulation_set(location, coordinates.latitude, coordinates.longitude)
         }
     }
 
     func clearLocation() throws {
-        let session = try connectIfNeeded()
         defer { connection = nil }
-        try Self.check(
-            location_simulation_clear(session.location),
-            message: "無法送出清除指令。請確認 LocalDevVPN 後重試。"
-        )
+        try sendCommand(message: "無法送出清除指令。請確認 LocalDevVPN 後重試。", location_simulation_clear)
     }
 
-    private func connectIfNeeded() throws -> Connection {
+    private func sendCommand(
+        message: String,
+        _ command: (OpaquePointer?) -> UnsafeMutablePointer<IdeviceFfiError>?
+    ) throws {
+        if let connection {
+            guard let error = command(connection.location) else { return }
+            // The service connection can go stale while LocalDevVPN stays connected.
+            idevice_error_free(error)
+            self.connection = nil
+            try Task.checkCancellation()
+        }
+
+        let session = try connect()
+        try Self.check(command(session.location), message: message)
+        connection = session
+    }
+
+    private func connect() throws -> Connection {
 #if targetEnvironment(simulator)
         throw Failure.requiresIPhone
 #else
-        if let connection { return connection }
         guard Self.hasSavedPairing else { throw Failure.missingPairing }
 
         idevice_set_global_timeout(10)
@@ -111,7 +116,6 @@ actor LocationSimulation {
             location_simulation_new(session.server, &session.location),
             message: "無法開啟定位模擬服務。"
         )
-        connection = session
         return session
 #endif
     }
