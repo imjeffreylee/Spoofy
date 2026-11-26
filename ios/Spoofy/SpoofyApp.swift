@@ -1,3 +1,4 @@
+import Network
 import SwiftUI
 import UniformTypeIdentifiers
 
@@ -59,6 +60,7 @@ private struct SimulationView: View {
     @State private var operation: String?
     @State private var message: String?
     @State private var failed = false
+    @State private var isUsingCellularData = false
 
     private var coordinates: Coordinates? { Coordinates(text: coordinateText) }
     private var startCoordinates: Coordinates? { Coordinates(text: startText) }
@@ -161,6 +163,15 @@ private struct SimulationView: View {
                 }
             }
             .navigationTitle("Spoofy")
+            .task {
+                let monitor = NWPathMonitor()
+                defer { monitor.cancel() }
+                for await path in monitor {
+                    isUsingCellularData = path.status == .satisfied
+                        && path.usesInterfaceType(.cellular)
+                        && !path.usesInterfaceType(.wifi)
+                }
+            }
             .alert(placeDialog?.title ?? "", isPresented: isPlaceDialogPresented, presenting: placeDialog) { dialog in
                 switch dialog {
                 case let .add(coordinates):
@@ -341,7 +352,15 @@ private struct SimulationView: View {
 
     private func setLocation(_ coordinates: Coordinates) {
         guard hasPairing, coordinates.isValid else { return }
-        perform("正在設定座標") {
+        perform("正在設定座標", failureMessage: { error in
+            let description = error.localizedDescription
+            guard isUsingCellularData, !(error is CancellationError) else { return description }
+            return """
+                \(description)
+
+                目前使用行動數據。請保持 LocalDevVPN 連線，暫時關閉行動數據，再設定一次座標。設定成功後即可重新開啟行動數據。
+                """
+        }) {
             let locationSession = SimulationLocationSession { _ in }
             defer {
                 if locationHoldTask == nil { locationSession.stop() }
@@ -447,6 +466,7 @@ private struct SimulationView: View {
     private func perform(
         _ progress: String,
         cancelling movement: Task<Void, Never>? = nil,
+        failureMessage: @escaping @MainActor (Error) -> String = { $0.localizedDescription },
         action: @escaping @MainActor () async throws -> String
     ) {
         guard operation == nil, movementTask == nil || movement != nil else { return }
@@ -462,7 +482,7 @@ private struct SimulationView: View {
                 message = try await action()
                 failed = false
             } catch {
-                message = error.localizedDescription
+                message = failureMessage(error)
                 failed = true
             }
         }
