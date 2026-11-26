@@ -2,12 +2,12 @@ import CoreLocation
 import Foundation
 
 @MainActor
-final class MovementLocationSession: NSObject, @preconcurrency CLLocationManagerDelegate {
+final class SimulationLocationSession: NSObject, @preconcurrency CLLocationManagerDelegate {
     // Core Location uses the run loop of the thread that creates the manager.
     private let manager = CLLocationManager()
     private let authorizationEvents = AsyncStream<CLAuthorizationStatus>.makeStream(bufferingPolicy: .bufferingNewest(1))
     private let reportSimulatedLocation: (Bool) -> Void
-    private var isMonitoring = false
+    private(set) var isMonitoring = false
 
     init(reportSimulatedLocation: @escaping (Bool) -> Void) {
         self.reportSimulatedLocation = reportSimulatedLocation
@@ -59,9 +59,9 @@ final class MovementLocationSession: NSObject, @preconcurrency CLLocationManager
         if isMonitoring { reportSimulatedLocation(false) }
     }
 
-    private struct LocationPermissionRequired: LocalizedError {
+    struct LocationPermissionRequired: LocalizedError {
         var errorDescription: String? {
-            "模擬移動需要定位權限。請到 iPhone 的「設定 → App → Spoofy → 位置」選擇「使用 App 期間」。"
+            "維持模擬定位需要定位權限。請到 iPhone 的「設定 → App → Spoofy → 位置」選擇「使用 App 期間」。"
         }
     }
 }

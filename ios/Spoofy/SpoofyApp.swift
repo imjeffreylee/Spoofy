@@ -53,6 +53,7 @@ private struct SimulationView: View {
     @State private var routeType = MovementSettings.RouteType.walking
     @State private var speedKPH: Double = 19
     @State private var movementTask: Task<Void, Never>?
+    @State private var locationHoldTask: Task<Void, Never>?
     @State private var movementProgress: Double?
     @State private var observedSimulatedLocation = false
     @State private var operation: String?
@@ -341,19 +342,36 @@ private struct SimulationView: View {
     private func setLocation(_ coordinates: Coordinates) {
         guard hasPairing, coordinates.isValid else { return }
         perform("正在設定座標") {
+            let locationSession = SimulationLocationSession { _ in }
+            defer {
+                if locationHoldTask == nil { locationSession.stop() }
+            }
+            do {
+                try await locationSession.start()
+            } catch is SimulationLocationSession.LocationPermissionRequired {
+                // A one-time location command is still available without Core Location permission.
+            }
             try await simulation.setLocation(coordinates)
-            return "已送出座標 \(coordinates.latitude), \(coordinates.longitude)。請到 Apple 地圖確認。"
+            guard locationSession.isMonitoring else {
+                return "已送出座標。允許 Spoofy 在使用期間取用位置，即可在切換 App 後維持定位。"
+            }
+            let status = "正在維持座標 \(coordinates.latitude), \(coordinates.longitude)。"
+            holdLocation(coordinates, using: locationSession, status: status)
+            return status
         }
     }
 
     private func startMovement(_ settings: MovementSettings) {
         guard hasPairing, !busy, settings.isValid else { return }
+        let previousHold = locationHoldTask
+        previousHold?.cancel()
         movementTask = Task {
-            let locationSession = MovementLocationSession {
+            await previousHold?.value
+            let locationSession = SimulationLocationSession {
                 observedSimulatedLocation = $0
             }
             defer {
-                locationSession.stop()
+                if locationHoldTask == nil { locationSession.stop() }
                 movementTask = nil
                 movementProgress = nil
                 observedSimulatedLocation = false
@@ -375,13 +393,53 @@ private struct SimulationView: View {
                     movementProgress = progress
                 }
                 try Task.checkCancellation()
-                message = "已抵達終點。點「停止模擬」可恢復實際定位。"
+                let status = "已抵達終點，正在維持終點座標。"
+                holdLocation(settings.end, using: locationSession, status: status)
+                message = status
                 failed = false
             } catch where !Task.isCancelled {
                 message = error.localizedDescription
                 failed = true
             } catch {
                 // The Stop action clears the location after this task exits.
+            }
+        }
+    }
+
+    private func holdLocation(_ coordinates: Coordinates, using session: SimulationLocationSession, status: String) {
+        locationHoldTask = Task {
+            defer {
+                session.stop()
+                locationHoldTask = nil
+                observedSimulatedLocation = false
+            }
+            var failures = 0
+            do {
+                while true {
+                    try await Task.sleep(for: .seconds(10))
+                    try session.requireAuthorization()
+                    do {
+                        // The send also reopens a stale connection if it has dropped in the background.
+                        try await simulation.setLocation(coordinates)
+                        try Task.checkCancellation()
+                        if failures > 0 {
+                            failures = 0
+                            message = status
+                            failed = false
+                        }
+                    } catch {
+                        try Task.checkCancellation()
+                        failures += 1
+                        if failures >= 3 { throw error }
+                        message = "模擬定位連線中斷，正在重新連線。"
+                        failed = false
+                    }
+                }
+            } catch where !Task.isCancelled {
+                message = error.localizedDescription
+                failed = true
+            } catch {
+                // Stop and replacement actions wait for this task before writing another location.
             }
         }
     }
@@ -393,10 +451,13 @@ private struct SimulationView: View {
     ) {
         guard operation == nil, movementTask == nil || movement != nil else { return }
         operation = progress
+        let previousHold = locationHoldTask
+        previousHold?.cancel()
         movement?.cancel()
         Task {
             defer { operation = nil }
             await movement?.value
+            await previousHold?.value
             do {
                 message = try await action()
                 failed = false

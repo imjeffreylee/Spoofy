@@ -25,7 +25,7 @@
     <key>NSLocalNetworkUsageDescription</key>
     <string>Spoofy 透過 LocalDevVPN 連到這支 iPhone 的開發者定位模擬服務。</string>
     <key>NSLocationWhenInUseUsageDescription</key>
-    <string>Spoofy 在模擬移動時確認系統回報的位置，讓路線可以在切換 App 後繼續播放。</string>
+    <string>Spoofy 在模擬定位期間確認系統回報的位置，以便在切換 App 後維持設定的座標或繼續播放路線。</string>
     <key>UIBackgroundModes</key>
     <array>
         <string>location</string>
