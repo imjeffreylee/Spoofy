@@ -17,3 +17,10 @@ config.json
 # 其他
 .vscode/
 .idea/
+
+# iOS local dependencies and Xcode state
+/ios/Vendor/
+/ios/DerivedData/
+xcuserdata/
+*.mobiledevicepairing
+/ios/**/pairing.plist
