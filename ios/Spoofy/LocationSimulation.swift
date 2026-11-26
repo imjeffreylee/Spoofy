@@ -104,7 +104,10 @@ actor LocationSimulation {
                         socketAddress, socklen_t(addressLength), "Spoofy", pairing, nil, nil,
                         &session.adapter, &session.handshake
                     ),
-                    message: "無法連到這支 iPhone。請確認開發者模式、LocalDevVPN 和配對紀錄。"
+                    message: """
+                        無法連到這支 iPhone。請確認開發者模式、LocalDevVPN 和配對紀錄。
+                        若使用 4G／5G 設定固定座標，請保持 LocalDevVPN 連線，暫時關閉行動數據後重試。看到「正在維持座標」後即可重新開啟行動數據。
+                        """
                 )
             }
         }
